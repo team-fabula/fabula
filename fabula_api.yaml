@@ -1,0 +1,916 @@
+openapi: 3.0.3
+info:
+  title: Fabula API
+  version: 1.0.0
+  description: |
+    REST contract for the Fabula web, Android and iOS clients (Must Have scope plus selected Should Have endpoints).
+
+    **Conventions**
+    - Workspace resources live under `/workspaces/{workspaceId}`. The server compares the path workspace with the session workspace and rejects a mismatch with `403` and code `WORKSPACE_MISMATCH`.
+    - Authentication: opaque session token, `Authorization: Bearer <token>`. Operations with `security: []` are public.
+    - Any operation may also return 401, 403, 404 and 429. 426 is returned when `X-Client-Version` is below the minimum supported version. Only operation-specific errors are listed per operation.
+    - Errors use the `Error` schema. Timestamps are ISO 8601 UTC, identifiers are UUIDs, enumerations are uppercase strings.
+    - Mentions: message text contains tokens `<@userId>`. Clients replace display names with these tokens before sending and render them back as names. The server parses the tokens and validates that each user is a channel member.
+    - Real-time events are delivered over WebSocket, not HTTP. Their schemas (`EventEnvelope` and payloads) are included in components so all clients share one set of types.
+servers:
+  - url: https://api.fabula.example/api/v1
+    description: Placeholder host
+security:
+  - bearerAuth: []
+tags:
+  - {name: Auth, description: 'Registration, login and sessions'}
+  - {name: Profile, description: Current user and devices}
+  - {name: Channels, description: Channel lifecycle and membership}
+  - {name: Messages, description: 'Messages, pins, read position, search'}
+  - {name: Notifications, description: Notification center}
+  - {name: Admin, description: 'Workspace administration (web client only, BR-20)'}
+
+paths:
+  # ------------------------------------------------------------------ Auth
+  /workspaces:
+    post:
+      tags: [Auth]
+      operationId: registerWorkspace
+      summary: Register a workspace and its first administrator (FR-AUTH-02)
+      security: []
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RegisterWorkspaceRequest'}}}}
+      responses:
+        '201': {description: Workspace and account created, content: {application/json: {schema: {$ref: '#/components/schemas/Session'}}}}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Invalid'}
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: Validate credentials (FR-AUTH-03, BR-21)
+      description: |
+        Unknown email and wrong password return the same 401 message. After 5 consecutive failures login is blocked for 10 minutes (423).
+        If the user has exactly one eligible workspace, a session is returned directly. Otherwise a single-use `loginTicket` and the workspace list are returned and the client calls `/auth/select-workspace`.
+      security: []
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LoginRequest'}}}}
+      responses:
+        '200': {description: Login result, content: {application/json: {schema: {$ref: '#/components/schemas/LoginResult'}}}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '423': {$ref: '#/components/responses/Locked'}
+
+  /auth/select-workspace:
+    post:
+      tags: [Auth]
+      operationId: selectWorkspace
+      summary: Exchange the login ticket for a workspace session (FR-AUTH-03)
+      security: [{loginTicket: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SelectWorkspaceRequest'}}}}
+      responses:
+        '200': {description: Session issued, content: {application/json: {schema: {$ref: '#/components/schemas/Session'}}}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      summary: End the current session and close its real-time connection (FR-AUTH-04)
+      responses:
+        '204': {description: Logged out}
+
+  /auth/password-reset:
+    post:
+      tags: [Auth]
+      operationId: requestPasswordReset
+      summary: Request a password reset email (FR-AUTH-06, Should Have)
+      description: Always returns 202, regardless of whether the email is registered.
+      security: []
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PasswordResetRequest'}}}}
+      responses:
+        '202': {description: Accepted}
+
+  /auth/password-reset/confirm:
+    post:
+      tags: [Auth]
+      operationId: confirmPasswordReset
+      summary: Set a new password with a reset token; ends all sessions (FR-AUTH-06)
+      security: []
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PasswordResetConfirm'}}}}
+      responses:
+        '204': {description: Password changed}
+        '422': {$ref: '#/components/responses/Invalid'}
+
+  /invitations/{token}:
+    parameters:
+      - {name: token, in: path, required: true, schema: {type: string}}
+    get:
+      tags: [Auth]
+      operationId: getInvitation
+      summary: Inspect an invitation link (FR-AUTH-01)
+      description: Returns 404 for an invalid, expired, used or revoked link.
+      security: []
+      responses:
+        '200': {description: Invitation details, content: {application/json: {schema: {$ref: '#/components/schemas/InvitationInfo'}}}}
+
+  /invitations/{token}/verification-codes:
+    parameters:
+      - {name: token, in: path, required: true, schema: {type: string}}
+    post:
+      tags: [Auth]
+      operationId: sendInvitationVerificationCode
+      summary: Send an email confirmation code for a shared link (FR-AUTH-01, FR-ADM-10)
+      description: The email must belong to the linked domain.
+      security: []
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/VerificationCodeRequest'}}}}
+      responses:
+        '202': {description: Code sent}
+        '422': {$ref: '#/components/responses/Invalid'}
+
+  /invitations/{token}/accept:
+    parameters:
+      - {name: token, in: path, required: true, schema: {type: string}}
+    post:
+      tags: [Auth]
+      operationId: acceptInvitation
+      summary: Register through an invitation, or join as an existing user (FR-AUTH-01, BR-10)
+      description: |
+        New user: `displayName` and `password` (BR-18). Existing user: `password` only, which authenticates the account.
+        Shared link: `email` and `verificationCode` are required. Individual link: the email is fixed by the invitation.
+      security: []
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AcceptInvitationRequest'}}}}
+      responses:
+        '201': {description: 'Membership created, session issued', content: {application/json: {schema: {$ref: '#/components/schemas/Session'}}}}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Invalid'}
+
+  # --------------------------------------------------------------- Profile
+  /me:
+    get:
+      tags: [Profile]
+      operationId: getMe
+      summary: Current user and active workspaces
+      responses:
+        '200': {description: Current user, content: {application/json: {schema: {$ref: '#/components/schemas/Me'}}}}
+    patch:
+      tags: [Profile]
+      operationId: updateMe
+      summary: Edit display name (FR-AUTH-05)
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/UpdateProfileRequest'}}}}
+      responses:
+        '200': {description: Updated profile, content: {application/json: {schema: {$ref: '#/components/schemas/UserProfile'}}}}
+        '422': {$ref: '#/components/responses/Invalid'}
+
+  /me/password:
+    put:
+      tags: [Profile]
+      operationId: changePassword
+      summary: Change password; ends the user's other sessions (FR-AUTH-05)
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ChangePasswordRequest'}}}}
+      responses:
+        '204': {description: Password changed}
+        '422': {$ref: '#/components/responses/Invalid'}
+
+  /me/devices:
+    get:
+      tags: [Profile]
+      operationId: listDevices
+      summary: List the user's registered mobile devices
+      responses:
+        '200': {description: Devices, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/Device'}}}}}
+    post:
+      tags: [Profile]
+      operationId: registerDevice
+      summary: Register or refresh a mobile device push token (mobile clients only)
+      description: Called after login and whenever the push token changes. Registering the same token again updates the existing entry.
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RegisterDeviceRequest'}}}}
+      responses:
+        '201': {description: Device registered, content: {application/json: {schema: {$ref: '#/components/schemas/Device'}}}}
+        '422': {$ref: '#/components/responses/Invalid'}
+
+  /me/devices/{deviceId}:
+    parameters:
+      - {name: deviceId, in: path, required: true, schema: {type: string, format: uuid}}
+    delete:
+      tags: [Profile]
+      operationId: revokeDevice
+      summary: Revoke a device so it no longer receives push notifications
+      responses:
+        '204': {description: Device revoked}
+
+  # -------------------------------------------------------------- Channels
+  /workspaces/{workspaceId}/members:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Channels]
+      operationId: searchWorkspaceMembers
+      summary: Search active workspace members by name or email (FR-CH-05)
+      parameters:
+        - {name: q, in: query, schema: {type: string}}
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200': {description: Members, content: {application/json: {schema: {$ref: '#/components/schemas/MemberPage'}}}}
+
+  /workspaces/{workspaceId}/channels:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Channels]
+      operationId: listMyChannels
+      summary: Channels of the current user with unread indicators (FR-CH-03, FR-NOT-01)
+      description: Sorted alphabetically. Archived channels are included with `archived=true` for a separate group.
+      responses:
+        '200': {description: Channels, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/ChannelListItem'}}}}}
+    post:
+      tags: [Channels]
+      operationId: createChannel
+      summary: Create a channel; the creator becomes its manager (FR-CH-01, BR-12)
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CreateChannelRequest'}}}}
+      responses:
+        '201': {description: Channel created, content: {application/json: {schema: {$ref: '#/components/schemas/Channel'}}}}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Invalid'}
+
+  /workspaces/{workspaceId}/channels/browse:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Channels]
+      operationId: browseChannels
+      summary: Browse non-archived public channels (FR-CH-03)
+      parameters:
+        - {name: q, in: query, description: Search by name, schema: {type: string}}
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200': {description: Public channels, content: {application/json: {schema: {$ref: '#/components/schemas/ChannelPage'}}}}
+
+  /workspaces/{workspaceId}/channels/{channelId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ChannelId'
+    get:
+      tags: [Channels]
+      operationId: getChannel
+      summary: Channel details (administrators receive `myRole=GHOST` for channels they are not members of, FR-ADM-09)
+      responses:
+        '200': {description: Channel, content: {application/json: {schema: {$ref: '#/components/schemas/Channel'}}}}
+    patch:
+      tags: [Channels]
+      operationId: updateChannel
+      summary: Edit name and description (FR-CH-07)
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/UpdateChannelRequest'}}}}
+      responses:
+        '200': {description: Updated channel, content: {application/json: {schema: {$ref: '#/components/schemas/Channel'}}}}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Invalid'}
+    delete:
+      tags: [Channels]
+      operationId: deleteChannel
+      summary: Delete a channel after typing its name (FR-CH-09)
+      parameters:
+        - {name: confirmName, in: query, required: true, description: Must equal the channel name, schema: {type: string}}
+      responses:
+        '204': {description: Channel deleted}
+        '422': {$ref: '#/components/responses/Invalid'}
+
+  /workspaces/{workspaceId}/channels/{channelId}/join:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ChannelId'
+    post:
+      tags: [Channels]
+      operationId: joinChannel
+      summary: Join a public channel (FR-CH-03, BR-04)
+      responses:
+        '204': {description: Joined}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  /workspaces/{workspaceId}/channels/{channelId}/leave:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ChannelId'
+    post:
+      tags: [Channels]
+      operationId: leaveChannel
+      summary: Leave a channel (FR-CH-04, BR-03)
+      description: Returns 409 `LAST_MANAGER` if the user is the last manager.
+      responses:
+        '204': {description: Left}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  /workspaces/{workspaceId}/channels/{channelId}/members:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ChannelId'
+    get:
+      tags: [Channels]
+      operationId: listChannelMembers
+      summary: Channel members, also used for mention suggestions (FR-MSG-08, FR-MSG-11)
+      parameters:
+        - {name: q, in: query, schema: {type: string}}
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200': {description: Members, content: {application/json: {schema: {$ref: '#/components/schemas/ChannelMemberPage'}}}}
+    post:
+      tags: [Channels]
+      operationId: addChannelMember
+      summary: Add an active workspace member to the channel (FR-CH-05)
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AddChannelMemberRequest'}}}}
+      responses:
+        '201': {description: Member added, content: {application/json: {schema: {$ref: '#/components/schemas/ChannelMember'}}}}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  /workspaces/{workspaceId}/channels/{channelId}/members/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ChannelId'
+      - $ref: '#/components/parameters/UserId'
+    delete:
+      tags: [Channels]
+      operationId: removeChannelMember
+      summary: Remove a member (FR-CH-05, BR-03)
+      responses:
+        '204': {description: Removed}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  /workspaces/{workspaceId}/channels/{channelId}/members/{userId}/role:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ChannelId'
+      - $ref: '#/components/parameters/UserId'
+    put:
+      tags: [Channels]
+      operationId: setChannelMemberRole
+      summary: Promote or demote a Channel Manager (FR-CH-05, BR-03)
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SetChannelRoleRequest'}}}}
+      responses:
+        '200': {description: Updated member, content: {application/json: {schema: {$ref: '#/components/schemas/ChannelMember'}}}}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  /workspaces/{workspaceId}/channels/{channelId}/archive:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ChannelId'
+    post:
+      tags: [Channels]
+      operationId: archiveChannel
+      summary: Archive a channel, making it read-only (FR-CH-08, BR-08)
+      responses:
+        '200': {description: Archived channel, content: {application/json: {schema: {$ref: '#/components/schemas/Channel'}}}}
+
+  /workspaces/{workspaceId}/channels/{channelId}/restore:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ChannelId'
+    post:
+      tags: [Channels]
+      operationId: restoreChannel
+      summary: Restore an archived channel (FR-CH-08)
+      responses:
+        '200': {description: Restored channel, content: {application/json: {schema: {$ref: '#/components/schemas/Channel'}}}}
+
+  # -------------------------------------------------------------- Messages
+  /workspaces/{workspaceId}/channels/{channelId}/messages:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ChannelId'
+    get:
+      tags: [Messages]
+      operationId: listMessages
+      summary: Message history and reconnect catch-up (FR-MSG-03, FR-MSG-02)
+      description: |
+        Without cursors returns the 50 most recent messages. `before` returns the page preceding the given message (scrolling up);
+        `after` returns the page following it (catch-up after reconnect; repeat while `hasMore` is true).
+        Items are ordered by server timestamp, oldest first (BR-15). Deleted messages have `deleted=true` and no text (BR-07).
+      parameters:
+        - {name: before, in: query, description: Message id, schema: {type: string, format: uuid}}
+        - {name: after, in: query, description: Message id, schema: {type: string, format: uuid}}
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200': {description: Messages, content: {application/json: {schema: {$ref: '#/components/schemas/MessagePage'}}}}
+    post:
+      tags: [Messages]
+      operationId: sendMessage
+      summary: Send a message (FR-MSG-01, FR-MSG-02, FR-MSG-08, BR-06)
+      description: |
+        Idempotent by `clientMessageId`: a retry returns the stored message with 200 instead of 201.
+        Rejected with 409 `CHANNEL_ARCHIVED` in archived channels and 403 for non-members (including administrators in ghost mode).
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SendMessageRequest'}}}}
+      responses:
+        '200': {description: Already stored (retry), content: {application/json: {schema: {$ref: '#/components/schemas/Message'}}}}
+        '201': {description: Message stored, content: {application/json: {schema: {$ref: '#/components/schemas/Message'}}}}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Invalid'}
+
+  /workspaces/{workspaceId}/channels/{channelId}/messages/{messageId}:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ChannelId'
+      - $ref: '#/components/parameters/MessageId'
+    patch:
+      tags: [Messages]
+      operationId: editMessage
+      summary: Edit own message (FR-MSG-04)
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/EditMessageRequest'}}}}
+      responses:
+        '200': {description: Updated message, content: {application/json: {schema: {$ref: '#/components/schemas/Message'}}}}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Invalid'}
+    delete:
+      tags: [Messages]
+      operationId: deleteMessage
+      summary: Delete own message, or any message as Channel Manager / Administrator (FR-MSG-05)
+      responses:
+        '204': {description: Deleted}
+
+  /workspaces/{workspaceId}/channels/{channelId}/messages/{messageId}/pin:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ChannelId'
+      - $ref: '#/components/parameters/MessageId'
+    put:
+      tags: [Messages]
+      operationId: pinMessage
+      summary: Pin a message (FR-MSG-06, BR-14)
+      responses:
+        '200': {description: Pinned message, content: {application/json: {schema: {$ref: '#/components/schemas/Message'}}}}
+        '409': {$ref: '#/components/responses/Conflict'}
+    delete:
+      tags: [Messages]
+      operationId: unpinMessage
+      summary: Unpin a message (FR-MSG-06)
+      responses:
+        '204': {description: Unpinned}
+
+  /workspaces/{workspaceId}/channels/{channelId}/pins:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ChannelId'
+    get:
+      tags: [Messages]
+      operationId: listPinnedMessages
+      summary: Pinned messages panel (FR-MSG-06)
+      responses:
+        '200': {description: Pinned messages, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/Message'}}}}}
+
+  /workspaces/{workspaceId}/channels/{channelId}/read-position:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/ChannelId'
+    put:
+      tags: [Messages]
+      operationId: setReadPosition
+      summary: Store the last seen message; synchronised across devices (FR-NOT-01)
+      description: The position never moves backwards. Other devices receive a `channel.unread` event.
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ReadPositionRequest'}}}}
+      responses:
+        '200': {description: Updated unread state, content: {application/json: {schema: {$ref: '#/components/schemas/UnreadState'}}}}
+
+  /workspaces/{workspaceId}/search/messages:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Messages]
+      operationId: searchMessages
+      summary: Search messages in channels the user belongs to (FR-MSG-07, FR-MSG-09)
+      description: Case-insensitive, newest first, 20 per page. `q` shorter than 2 characters returns 422. Deleted messages are never returned. Filters are Should Have.
+      parameters:
+        - {name: q, in: query, required: true, schema: {type: string, minLength: 2}}
+        - {name: channelId, in: query, schema: {type: string, format: uuid}}
+        - {name: authorId, in: query, schema: {type: string, format: uuid}}
+        - {name: from, in: query, schema: {type: string, format: date-time}}
+        - {name: to, in: query, schema: {type: string, format: date-time}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 20, default: 20}}
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200': {description: Results, content: {application/json: {schema: {$ref: '#/components/schemas/SearchResultPage'}}}}
+        '422': {$ref: '#/components/responses/Invalid'}
+
+  # --------------------------------------------------------- Notifications
+  /workspaces/{workspaceId}/notifications:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Notifications]
+      operationId: listNotifications
+      summary: Notification center, latest 50 first (FR-NOT-02)
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200': {description: Notifications and unread counter, content: {application/json: {schema: {$ref: '#/components/schemas/NotificationPage'}}}}
+
+  /workspaces/{workspaceId}/notifications/{notificationId}/read:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - {name: notificationId, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      tags: [Notifications]
+      operationId: markNotificationRead
+      summary: Mark one notification as read (FR-NOT-02)
+      responses:
+        '204': {description: Marked as read}
+
+  /workspaces/{workspaceId}/notifications/read-all:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    post:
+      tags: [Notifications]
+      operationId: markAllNotificationsRead
+      summary: Mark all notifications as read (FR-NOT-02)
+      responses:
+        '204': {description: Marked as read}
+
+  # ----------------------------------------------------------------- Admin
+  /workspaces/{workspaceId}/admin/invitations:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Admin]
+      operationId: listInvitations
+      summary: Individual and shared invitations (FR-ADM-02)
+      parameters:
+        - {name: status, in: query, schema: {$ref: '#/components/schemas/InvitationStatus'}}
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200': {description: Invitations, content: {application/json: {schema: {$ref: '#/components/schemas/InvitationPage'}}}}
+    post:
+      tags: [Admin]
+      operationId: createInvitation
+      summary: Create an individual or shared invitation (FR-ADM-01, FR-ADM-10, FR-ADM-11)
+      description: |
+        INDIVIDUAL requires `email` (single use, 7 days, 409 if already a member or pending). SHARED requires `verifiedDomainId` (valid until revoked).
+        `link` is returned only in this response and by regenerate; only a hash is stored. `sendEmail` (Should Have) also emails an individual link.
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CreateInvitationRequest'}}}}
+      responses:
+        '201': {description: Invitation created, content: {application/json: {schema: {$ref: '#/components/schemas/Invitation'}}}}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Invalid'}
+
+  /workspaces/{workspaceId}/admin/invitations/{invitationId}/revoke:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/InvitationId'
+    post:
+      tags: [Admin]
+      operationId: revokeInvitation
+      summary: Revoke a pending individual or a shared invitation (FR-ADM-02, FR-ADM-10)
+      responses:
+        '204': {description: Revoked}
+
+  /workspaces/{workspaceId}/admin/invitations/{invitationId}/regenerate:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/InvitationId'
+    post:
+      tags: [Admin]
+      operationId: regenerateInvitation
+      summary: Regenerate an individual link; the old link stops working (FR-ADM-02)
+      responses:
+        '200': {description: New link, content: {application/json: {schema: {$ref: '#/components/schemas/Invitation'}}}}
+
+  /workspaces/{workspaceId}/admin/domains:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Admin]
+      operationId: listDomains
+      summary: Linked email domains (FR-ADM-10)
+      responses:
+        '200': {description: Domains, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/VerifiedDomain'}}}}}
+    post:
+      tags: [Admin]
+      operationId: linkDomain
+      summary: Link a domain and receive the DNS TXT record to add (FR-ADM-10)
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LinkDomainRequest'}}}}
+      responses:
+        '201': {description: Domain pending verification, content: {application/json: {schema: {$ref: '#/components/schemas/VerifiedDomain'}}}}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Invalid'}
+
+  /workspaces/{workspaceId}/admin/domains/{domainId}/verify:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - {name: domainId, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      tags: [Admin]
+      operationId: verifyDomain
+      summary: Check the DNS TXT record and mark the domain verified (FR-ADM-10)
+      responses:
+        '200': {description: Verification result, content: {application/json: {schema: {$ref: '#/components/schemas/VerifiedDomain'}}}}
+        '422': {$ref: '#/components/responses/Invalid'}
+
+  /workspaces/{workspaceId}/admin/users:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Admin]
+      operationId: listUsers
+      summary: User directory (FR-ADM-03)
+      parameters:
+        - {name: q, in: query, schema: {type: string}}
+        - {name: status, in: query, schema: {$ref: '#/components/schemas/MembershipStatus'}}
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200': {description: Users, content: {application/json: {schema: {$ref: '#/components/schemas/MemberPage'}}}}
+
+  /workspaces/{workspaceId}/admin/users/{userId}/role:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/UserId'
+    put:
+      tags: [Admin]
+      operationId: setWorkspaceRole
+      summary: Change workspace role (FR-ADM-04, BR-17)
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/SetWorkspaceRoleRequest'}}}}
+      responses:
+        '200': {description: Updated user, content: {application/json: {schema: {$ref: '#/components/schemas/Member'}}}}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  /workspaces/{workspaceId}/admin/users/{userId}/deactivate:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/UserId'
+    post:
+      tags: [Admin]
+      operationId: deactivateUser
+      summary: Deactivate a user; their sessions end within seconds (FR-ADM-05, BR-09, BR-17)
+      responses:
+        '200': {description: Deactivated user, content: {application/json: {schema: {$ref: '#/components/schemas/Member'}}}}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  /workspaces/{workspaceId}/admin/users/{userId}/reactivate:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+      - $ref: '#/components/parameters/UserId'
+    post:
+      tags: [Admin]
+      operationId: reactivateUser
+      summary: Reactivate a user (FR-ADM-05)
+      responses:
+        '200': {description: Reactivated user, content: {application/json: {schema: {$ref: '#/components/schemas/Member'}}}}
+
+  /workspaces/{workspaceId}/admin/channels:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Admin]
+      operationId: listAllChannels
+      summary: All channels including private ones (FR-ADM-09)
+      description: A channel is opened in ghost mode through the regular channel and message endpoints; the administrator then has Channel Manager functions but cannot send or edit messages.
+      parameters:
+        - {name: q, in: query, schema: {type: string}}
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200': {description: Channels, content: {application/json: {schema: {$ref: '#/components/schemas/AdminChannelPage'}}}}
+
+  /workspaces/{workspaceId}/admin/audit-events:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Admin]
+      operationId: listAuditEvents
+      summary: Read-only audit log, newest first, 50 per page (FR-ADM-07, FR-ADM-03)
+      description: Use `targetUserId` to show the key events of one user.
+      parameters:
+        - {name: from, in: query, schema: {type: string, format: date-time}}
+        - {name: to, in: query, schema: {type: string, format: date-time}}
+        - {name: actorUserId, in: query, schema: {type: string, format: uuid}}
+        - {name: targetUserId, in: query, schema: {type: string, format: uuid}}
+        - {name: action, in: query, schema: {$ref: '#/components/schemas/AuditAction'}}
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200': {description: Audit events, content: {application/json: {schema: {$ref: '#/components/schemas/AuditEventPage'}}}}
+
+  /workspaces/{workspaceId}/admin/settings:
+    parameters:
+      - $ref: '#/components/parameters/WorkspaceId'
+    get:
+      tags: [Admin]
+      operationId: getSettings
+      summary: Workspace settings (FR-ADM-08)
+      responses:
+        '200': {description: Settings, content: {application/json: {schema: {$ref: '#/components/schemas/WorkspaceSettings'}}}}
+    put:
+      tags: [Admin]
+      operationId: updateSettings
+      summary: Update audit period, channel creation limit and fallback administrator (FR-ADM-08, FR-ADM-05)
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/WorkspaceSettings'}}}}
+      responses:
+        '200': {description: Updated settings, content: {application/json: {schema: {$ref: '#/components/schemas/WorkspaceSettings'}}}}
+        '422': {$ref: '#/components/responses/Invalid'}
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Opaque random session token bound to one workspace and device.
+    loginTicket:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Short-lived single-use JWT issued by `/auth/login`, accepted only by `/auth/select-workspace`.
+
+  parameters:
+    WorkspaceId: {name: workspaceId, in: path, required: true, schema: {type: string, format: uuid}}
+    ChannelId: {name: channelId, in: path, required: true, schema: {type: string, format: uuid}}
+    MessageId: {name: messageId, in: path, required: true, schema: {type: string, format: uuid}}
+    UserId: {name: userId, in: path, required: true, schema: {type: string, format: uuid}}
+    InvitationId: {name: invitationId, in: path, required: true, schema: {type: string, format: uuid}}
+    Limit: {name: limit, in: query, description: Page size (default 50), schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+    Cursor: {name: cursor, in: query, description: Opaque cursor from `nextCursor`, schema: {type: string}}
+
+  responses:
+    Invalid: {description: Validation failed (422), content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+    Conflict: {description: 'Conflict, e.g. duplicate name, last manager, archived channel (409)', content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+    Unauthorized: {description: Invalid credentials or token (401), content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+    Locked: {description: Login blocked for 10 minutes (423), content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+
+  schemas:
+    # ---- common
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: {type: string, example: WORKSPACE_MISMATCH}
+        message: {type: string}
+        fieldErrors:
+          type: array
+          items: {type: object, required: [field, message], properties: {field: {type: string}, message: {type: string}}}
+    WorkspaceRef: {type: object, required: [id, name], properties: {id: {type: string, format: uuid}, name: {type: string}}}
+    UserProfile: {type: object, required: [id, email, displayName], properties: {id: {type: string, format: uuid}, email: {type: string, format: email}, displayName: {type: string, maxLength: 100}}}
+    UserRef: {type: object, required: [userId, displayName], properties: {userId: {type: string, format: uuid}, displayName: {type: string}, deactivated: {type: boolean}}}
+    WorkspaceRole: {type: string, enum: [MEMBER, ADMINISTRATOR]}
+    MembershipStatus: {type: string, enum: [ACTIVE, DEACTIVATED]}
+    ChannelRole: {type: string, enum: [MEMBER, MANAGER, GHOST]}
+    Presence: {type: string, enum: [ONLINE, AWAY, OFFLINE]}
+
+    # ---- auth
+    RegisterWorkspaceRequest: {type: object, required: [workspaceName, email, displayName, password], properties: {workspaceName: {type: string, maxLength: 150}, email: {type: string, format: email}, displayName: {type: string, maxLength: 100}, password: {type: string, format: password, minLength: 10}}}
+    LoginRequest: {type: object, required: [email, password], properties: {email: {type: string, format: email}, password: {type: string, format: password}}}
+    LoginResult:
+      type: object
+      required: [requiresWorkspaceSelection]
+      properties:
+        requiresWorkspaceSelection: {type: boolean}
+        session: {allOf: [{$ref: '#/components/schemas/Session'}], nullable: true, description: Present when no selection is needed}
+        loginTicket: {type: string, description: 'Single-use JWT, present when selection is needed'}
+        workspaces: {type: array, items: {$ref: '#/components/schemas/WorkspaceRef'}}
+    SelectWorkspaceRequest: {type: object, required: [workspaceId], properties: {workspaceId: {type: string, format: uuid}}}
+    Session:
+      type: object
+      required: [token, expiresAt, workspace, user, role]
+      properties:
+        token: {type: string, description: 'Opaque bearer token, shown once'}
+        expiresAt: {type: string, format: date-time, description: Slides forward with activity (12 hours after the last activity)}
+        workspace: {$ref: '#/components/schemas/WorkspaceRef'}
+        user: {$ref: '#/components/schemas/UserProfile'}
+        role: {$ref: '#/components/schemas/WorkspaceRole'}
+    Me: {type: object, required: [user, workspaces], properties: {user: {$ref: '#/components/schemas/UserProfile'}, workspaces: {type: array, items: {$ref: '#/components/schemas/WorkspaceRef'}}}}
+    UpdateProfileRequest: {type: object, required: [displayName], properties: {displayName: {type: string, maxLength: 100}}}
+    ChangePasswordRequest: {type: object, required: [currentPassword, newPassword], properties: {currentPassword: {type: string, format: password}, newPassword: {type: string, format: password, minLength: 10}}}
+    PasswordResetRequest: {type: object, required: [email], properties: {email: {type: string, format: email}}}
+    PasswordResetConfirm: {type: object, required: [token, newPassword], properties: {token: {type: string}, newPassword: {type: string, format: password, minLength: 10}}}
+    InvitationInfo: {type: object, required: [type, workspaceName], properties: {type: {$ref: '#/components/schemas/InvitationType'}, workspaceName: {type: string}, email: {type: string, nullable: true, description: Fixed email of an individual invitation}, domainName: {type: string, nullable: true, description: Domain of a shared invitation}}}
+    VerificationCodeRequest: {type: object, required: [email], properties: {email: {type: string, format: email}}}
+    AcceptInvitationRequest: {type: object, required: [password], properties: {email: {type: string, format: email}, verificationCode: {type: string}, displayName: {type: string, maxLength: 100}, password: {type: string, format: password}}}
+    Device: {type: object, required: [id, platform, registeredAt], properties: {id: {type: string, format: uuid}, platform: {$ref: '#/components/schemas/DevicePlatform'}, registeredAt: {type: string, format: date-time}, lastSeenAt: {type: string, format: date-time, nullable: true}}}
+    DevicePlatform: {type: string, enum: [ANDROID, IOS]}
+    RegisterDeviceRequest: {type: object, required: [platform, pushToken], properties: {platform: {$ref: '#/components/schemas/DevicePlatform'}, pushToken: {type: string}}}
+
+    # ---- channels
+    Channel:
+      type: object
+      required: [id, name, visibility, archived, memberCount, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string, minLength: 1, maxLength: 80}
+        description: {type: string, maxLength: 250, nullable: true}
+        visibility: {type: string, enum: [PUBLIC, PRIVATE]}
+        archived: {type: boolean}
+        memberCount: {type: integer}
+        myRole: {allOf: [{$ref: '#/components/schemas/ChannelRole'}], nullable: true, description: Null for non-members of public channels}
+        createdAt: {type: string, format: date-time}
+    ChannelListItem:
+      allOf:
+        - $ref: '#/components/schemas/Channel'
+        - type: object
+          required: [hasUnread, unreadMentionCount]
+          properties:
+            hasUnread: {type: boolean, description: Unread messages without mentions exist (name shown in bold)}
+            unreadMentionCount: {type: integer, minimum: 0}
+    ChannelPage: {type: object, required: [items], properties: {items: {type: array, items: {$ref: '#/components/schemas/Channel'}}, nextCursor: {type: string, nullable: true}}}
+    CreateChannelRequest: {type: object, required: [name, visibility], properties: {name: {type: string, minLength: 1, maxLength: 80}, description: {type: string, maxLength: 250}, visibility: {type: string, enum: [PUBLIC, PRIVATE]}}}
+    UpdateChannelRequest: {type: object, properties: {name: {type: string, minLength: 1, maxLength: 80}, description: {type: string, maxLength: 250, nullable: true}}}
+    ChannelMember: {type: object, required: [userId, displayName, role, joinedAt], properties: {userId: {type: string, format: uuid}, displayName: {type: string}, role: {$ref: '#/components/schemas/ChannelRole'}, joinedAt: {type: string, format: date-time}, presence: {$ref: '#/components/schemas/Presence'}}}
+    ChannelMemberPage: {type: object, required: [items], properties: {items: {type: array, items: {$ref: '#/components/schemas/ChannelMember'}}, nextCursor: {type: string, nullable: true}}}
+    AddChannelMemberRequest: {type: object, required: [userId], properties: {userId: {type: string, format: uuid}}}
+    SetChannelRoleRequest: {type: object, required: [role], properties: {role: {type: string, enum: [MEMBER, MANAGER]}}}
+
+    # ---- messages
+    Message:
+      type: object
+      required: [id, channelId, author, clientMessageId, mentionedUserIds, isEdited, deleted, pinned, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        channelId: {type: string, format: uuid}
+        author: {$ref: '#/components/schemas/UserRef'}
+        clientMessageId: {type: string, format: uuid}
+        text: {type: string, maxLength: 4000, nullable: true, description: 'Contains <@userId> mention tokens; null when deleted'}
+        mentionedUserIds: {type: array, items: {type: string, format: uuid}}
+        isEdited: {type: boolean}
+        editedAt: {type: string, format: date-time, nullable: true}
+        deleted: {type: boolean}
+        pinned: {type: boolean}
+        createdAt: {type: string, format: date-time, description: 'Server-assigned, defines order'}
+    MessagePage: {type: object, required: [items, hasMore], properties: {items: {type: array, items: {$ref: '#/components/schemas/Message'}}, hasMore: {type: boolean}}}
+    SendMessageRequest: {type: object, required: [clientMessageId, text], properties: {clientMessageId: {type: string, format: uuid}, text: {type: string, minLength: 1, maxLength: 4000}}}
+    EditMessageRequest: {type: object, required: [text], properties: {text: {type: string, minLength: 1, maxLength: 4000}}}
+    ReadPositionRequest: {type: object, required: [lastReadMessageId], properties: {lastReadMessageId: {type: string, format: uuid}}}
+    UnreadState: {type: object, required: [channelId, hasUnread, unreadMentionCount], properties: {channelId: {type: string, format: uuid}, hasUnread: {type: boolean}, unreadMentionCount: {type: integer, minimum: 0}}}
+    SearchResult: {type: object, required: [message, channel, snippet], properties: {message: {$ref: '#/components/schemas/Message'}, channel: {type: object, required: [id, name], properties: {id: {type: string, format: uuid}, name: {type: string}}}, snippet: {type: string, description: 'Text fragment with the match marked by [[ and ]]'}}}
+    SearchResultPage: {type: object, required: [items], properties: {items: {type: array, items: {$ref: '#/components/schemas/SearchResult'}}, nextCursor: {type: string, nullable: true}}}
+
+    # ---- notifications
+    Notification:
+      type: object
+      required: [id, type, text, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        type: {type: string, enum: [ADDED_TO_CHANNEL, REMOVED_FROM_CHANNEL, MANAGER_GRANTED, MANAGER_REVOKED, CHANNEL_ARCHIVED, CHANNEL_RESTORED, CHANNEL_RENAMED, CHANNEL_DELETED, WORKSPACE_ROLE_CHANGED]}
+        text: {type: string}
+        channelId: {type: string, format: uuid, nullable: true}
+        createdAt: {type: string, format: date-time}
+        readAt: {type: string, format: date-time, nullable: true}
+    NotificationPage: {type: object, required: [items, unreadCount], properties: {items: {type: array, items: {$ref: '#/components/schemas/Notification'}}, nextCursor: {type: string, nullable: true}, unreadCount: {type: integer, minimum: 0}}}
+
+    # ---- admin
+    Member: {type: object, required: [userId, displayName, email, role, status, joinedAt], properties: {userId: {type: string, format: uuid}, displayName: {type: string}, email: {type: string, format: email}, role: {$ref: '#/components/schemas/WorkspaceRole'}, status: {$ref: '#/components/schemas/MembershipStatus'}, joinedAt: {type: string, format: date-time}}}
+    MemberPage: {type: object, required: [items], properties: {items: {type: array, items: {$ref: '#/components/schemas/Member'}}, nextCursor: {type: string, nullable: true}}}
+    SetWorkspaceRoleRequest: {type: object, required: [role], properties: {role: {$ref: '#/components/schemas/WorkspaceRole'}}}
+    InvitationType: {type: string, enum: [INDIVIDUAL, SHARED]}
+    InvitationStatus: {type: string, enum: [PENDING, USED, EXPIRED, REVOKED]}
+    Invitation:
+      type: object
+      required: [id, type, status, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        type: {$ref: '#/components/schemas/InvitationType'}
+        status: {$ref: '#/components/schemas/InvitationStatus'}
+        email: {type: string, nullable: true}
+        domainName: {type: string, nullable: true}
+        expiresAt: {type: string, format: date-time, nullable: true, description: Null for shared invitations}
+        createdAt: {type: string, format: date-time}
+        link: {type: string, format: uri, description: Returned only on create and regenerate}
+    InvitationPage: {type: object, required: [items], properties: {items: {type: array, items: {$ref: '#/components/schemas/Invitation'}}, nextCursor: {type: string, nullable: true}}}
+    CreateInvitationRequest: {type: object, required: [type], properties: {type: {$ref: '#/components/schemas/InvitationType'}, email: {type: string, format: email}, verifiedDomainId: {type: string, format: uuid}, sendEmail: {type: boolean, default: false}}}
+    LinkDomainRequest: {type: object, required: [domainName], properties: {domainName: {type: string, maxLength: 253}}}
+    VerifiedDomain: {type: object, required: [id, domainName, dnsTxtName, dnsTxtValue], properties: {id: {type: string, format: uuid}, domainName: {type: string}, dnsTxtName: {type: string}, dnsTxtValue: {type: string}, verifiedAt: {type: string, format: date-time, nullable: true}}}
+    AdminChannel: {type: object, required: [id, name, visibility, memberCount, archived, managers], properties: {id: {type: string, format: uuid}, name: {type: string}, visibility: {type: string, enum: [PUBLIC, PRIVATE]}, memberCount: {type: integer}, archived: {type: boolean}, managers: {type: array, items: {$ref: '#/components/schemas/UserRef'}}}}
+    AdminChannelPage: {type: object, required: [items], properties: {items: {type: array, items: {$ref: '#/components/schemas/AdminChannel'}}, nextCursor: {type: string, nullable: true}}}
+    AuditAction: {type: string, enum: [INVITATION_CREATED, INVITATION_REVOKED, INVITATION_REGENERATED, DOMAIN_LINKED, ROLE_CHANGED, USER_DEACTIVATED, USER_REACTIVATED, CHANNEL_ARCHIVED, CHANNEL_RESTORED, CHANNEL_DELETED, MESSAGE_DELETED_BY_MODERATOR, SETTINGS_CHANGED]}
+    AuditEvent: {type: object, required: [id, action, occurredAt], properties: {id: {type: string, format: uuid}, action: {$ref: '#/components/schemas/AuditAction'}, actor: {allOf: [{$ref: '#/components/schemas/UserRef'}], nullable: true}, targetUserId: {type: string, format: uuid, nullable: true}, targetType: {type: string}, targetId: {type: string, format: uuid, nullable: true}, details: {type: object, additionalProperties: true, nullable: true}, occurredAt: {type: string, format: date-time}}}
+    AuditEventPage: {type: object, required: [items], properties: {items: {type: array, items: {$ref: '#/components/schemas/AuditEvent'}}, nextCursor: {type: string, nullable: true}}}
+    WorkspaceSettings: {type: object, required: [auditRetentionDays], properties: {auditRetentionDays: {type: integer, minimum: 30, maximum: 3650, default: 90}, maxChannelsPerUser: {type: integer, minimum: 1, nullable: true, description: Null means unlimited}, fallbackAdminId: {type: string, format: uuid, nullable: true}}}
+
+    # ---- real-time (WebSocket, not HTTP)
+    EventEnvelope:
+      type: object
+      description: Every server-to-client WebSocket event. Delivery is at-least-once; clients deduplicate by `eventId`.
+      required: [eventId, type, occurredAt, workspaceId, payload]
+      properties:
+        eventId: {type: string, format: uuid}
+        type: {type: string, enum: [message.created, message.updated, message.deleted, channel.updated, channel.unread, membership.changed, notification.created, notification.read, presence.changed, typing.started]}
+        occurredAt: {type: string, format: date-time}
+        workspaceId: {type: string, format: uuid}
+        channelId: {type: string, format: uuid, nullable: true}
+        payload:
+          description: Depends on `type`; never contains the text of deleted messages.
+          oneOf:
+            - $ref: '#/components/schemas/MessageEventPayload'
+            - $ref: '#/components/schemas/MessageDeletedPayload'
+            - $ref: '#/components/schemas/ChannelUpdatedPayload'
+            - $ref: '#/components/schemas/UnreadState'
+            - $ref: '#/components/schemas/MembershipChangedPayload'
+            - $ref: '#/components/schemas/NotificationCreatedPayload'
+            - $ref: '#/components/schemas/NotificationReadPayload'
+            - $ref: '#/components/schemas/PresencePayload'
+            - $ref: '#/components/schemas/TypingStartedPayload'
+    MessageEventPayload: {type: object, required: [message], description: 'message.created and message.updated (edit, pin, unpin)', properties: {message: {$ref: '#/components/schemas/Message'}}}
+    MessageDeletedPayload: {type: object, required: [messageId], properties: {messageId: {type: string, format: uuid}}}
+    ChannelUpdatedPayload: {type: object, required: [channel, change], properties: {channel: {$ref: '#/components/schemas/Channel'}, change: {type: string, enum: [RENAMED, ARCHIVED, RESTORED, DELETED]}}}
+    MembershipChangedPayload: {type: object, required: [userId, change], properties: {userId: {type: string, format: uuid}, change: {type: string, enum: [ADDED, REMOVED, MANAGER_GRANTED, MANAGER_REVOKED]}}}
+    NotificationCreatedPayload: {type: object, required: [notification, unreadCount], properties: {notification: {$ref: '#/components/schemas/Notification'}, unreadCount: {type: integer, minimum: 0}}}
+    NotificationReadPayload: {type: object, required: [notificationIds, unreadCount], description: 'notification.read, sent to the user other devices', properties: {notificationIds: {type: array, items: {type: string, format: uuid}, description: Empty when all were marked as read}, allRead: {type: boolean}, unreadCount: {type: integer, minimum: 0}}}
+    PresencePayload: {type: object, required: [userId, status], properties: {userId: {type: string, format: uuid}, status: {$ref: '#/components/schemas/Presence'}}}
+    TypingStartedPayload: {type: object, required: [userId], properties: {userId: {type: string, format: uuid}}}
+    TypingSignal:
+      type: object
+      description: The only client-to-server WebSocket message besides pings. Sent at most once every 3 seconds while typing.
+      required: [type, channelId]
+      properties:
+        type: {type: string, enum: [typing]}
+        channelId: {type: string, format: uuid}
