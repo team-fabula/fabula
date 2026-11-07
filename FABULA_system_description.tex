@@ -1,0 +1,946 @@
+\documentclass[
+    english, % Klasei padavus parametrą 'english', darbas bus anglų kalba.
+    % signatureplaces % prideda parašų vietas tituliniame puslapyje
+]{VUMIFPSkursinis}
+\usepackage{float}
+\usepackage{wrapfig2}
+\usepackage{hyperref}
+\usepackage{algorithmicx}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{adjustbox}
+\usepackage{bm}
+\usepackage{caption}
+\usepackage{color}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{subcaption}
+\usepackage{biblatex}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{colortbl}
+\usepackage[latin1]{inputenc}
+\usepackage{tikz}
+\usepackage{longtable}
+
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,calc,fit,backgrounds,shadows}
+\usepackage{tikz-uml}
+\usepackage{emoji}
+\usepackage{comment}
+\usepackage{longtable}
+\usepackage{etoolbox}
+\AtBeginEnvironment{longtable}{\small\renewcommand{\arraystretch}{1.3}}
+\newcommand{\frhead}{\textbf{ID} & \textbf{Requirement \& description} \\ \hline}
+\usetikzlibrary{shapes,arrows}
+
+% Titulinio aprašas
+\university{Vilniaus universitetas}
+\faculty{Matematikos ir informatikos fakultetas}
+\department{Programų sistemų studijų programa}
+\papertype{PSP group project}
+\title{Fabula}
+\titleineng{Company communication platform}
+\author{\shortstack[l]{
+Aistė Aškinytė\\[0.4em]
+Petras Maciulevičius\\[0.4em]
+Artūras Ramoškevičius\\[0.4em]
+Ugnius Vaičeskas\\[0.4em]
+Haroldas Trinkūnas
+}}
+\status{3rd course 3rd group students}
+\supervisor{}
+\reviewer{}
+\date{Vilnius – \the\year}
+
+\bibliography{bibliografija}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+\clearpage
+
+%NEZINAU AR GLOSSARY BUTINA BET KOL KAS IDEJAU
+\section*{Glossary}
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{|p{0.22\textwidth}|p{0.68\textwidth}|}
+\hline
+\textbf{Term} & \textbf{Definition} \\ \hline
+Workspace & The organization-wide environment that contains all users and channels. \\ \hline
+Channel & A named text conversation space with a member list. Either public or private. \\ \hline
+Member & A user who belongs to a given channel. \\ \hline
+Archived channel & A read-only channel that accepts no new messages until restored. \\ \hline
+Invitation & A time-limited link issued by an administrator that allows one person to register. \\ \hline
+Audit period & The time deleted content is retained after deletion, configured by the administrator. \\ \hline
+\end{tabular}
+\end{table}
+
+\section{Introduction}
+
+Fabula --- Company Communication Platform.
+
+\subsection{Project Overview}
+Fabula is a multi-platform communication and collaboration platform designed for businesses and their employees. The system provides a centralized digital workspace where members of an organization can communicate, exchange information, find previous discussions and manage communication channels. 
+
+Modern organizations often rely on separate applications for internal messaging and team discussions. This fragmentation makes information harder to locate, creates unnecessary context switching, and increases the administrative effort required to manage access. Fabula addresses these problems by combining essential communication capabilities within one web application.
+
+Employees communicate through organized text channels, receive updates without manually refreshing the page and retrieve shared information from channel history. Authorized managers organize channels and control membership and permissions. Fabula is intended for both office-based and remote teams.
+
+The primary target audience is medium and large-sized organizations seeking a central environment for internal communication.
+
+\section{Feature List and Business Requirements}
+
+\subsection{System Description}
+
+\textbf{Fabula} consists of a single view environment for all user roles. Additional roles only unlock additional views and capabilities. A administrator of an organization registers the organization using the registration form. This administrator creates individual registration invitations or links the organization's domain and creates a shared registration invitation link. All new users (including the organization administrator) receive the base role “Member” (see \ref{features:user_roles} for more on roles).
+
+If a user account is linked to an organization email address, that account can belong to only one organization. Otherwise, the account may belong to multiple organizations, and the list of organizations and the choice of which one to log in to are presented at login, before the session is initiated.
+
+Every organization user can create a channel and invite other organization users to it. The maximum number of channels a user can create is set by the organization representative. The organization representative can also become a ghost user and view channels to which they are not assigned.
+
+Once in a channel, a user can send real-time messages, mention other users in them, edit their own messages, delete them, view the message history, and search it using the channel search. A channel manager can pin or unpin messages in the channel. For all channel users, the channel list shows, next to the channel name, the number of unread messages in which the user is mentioned. If there are ordinary unread messages, the channel name is simply shown in bold. Alongside the channel list there is also a notification center (a bell icon with unread notifications). It shows other organization notifications unrelated to messages.
+
+In addition to creating invitations, setting the channel creation limit, and being able to act as a ghost user in channels (including managing channel settings), the organization administrator can manage other organization settings, view the list of users (including a log of each user's key events), remove them, or add them to the organization's managers. The organization representative can use the functionality of their role only in the web version.
+
+
+\subsection{User Roles and Access Control}
+\label{features:user_roles}
+
+Fabula distinguishes three roles. \textbf{Workspace Administrator} role apply to the whole workspace; the \textbf{Channel Manager} role is assigned per channel, so one person can be a manager in one channel and a regular \textbf{Member} in another. All users are members, but in a context, they may have additional managing and / or administrative roles.
+
+\begin{table}[H]
+\centering
+\small
+\caption{User roles}
+\begin{tabular}{|p{0.2\textwidth}|p{0.75\textwidth}|}
+\hline
+\textbf{Role} & \textbf{Description} \\ \hline
+Member & Regular employee. Creates channels (becoming their Channel Manager), reads and writes messages in channels they belong to, mentions other members, edits or deletes own messages, searches the channel history, leaves channels. \\ \hline
+Channel Manager & A member with additional rights in one specific channel: manages its members, name, description and managers, pins and unpins messages, deletes any message in it and deletes the channel. \\ \hline
+Administrator & A person who registers an organization becomes its first administrator; others can be promoted. Manages the whole organization: invitations, email domain, channel creation limit, user list and removal of users, administrator role. Can open any channel in ghost mode with Channel Manager rights (without posting). Uses these functions in the web client only. \\ \hline
+\end{tabular}
+\end{table}
+
+
+\subsection{MoSCoW Framework}
+This section elaborates project into implementable requirements using the \textbf{MoSCoW} framework.
+
+\subsubsection{Must Have Requirements}
+Core functionality required for the initial version.
+
+\subsubsubsection{User Authentication and Accounts}
+
+\begin{longtable}{|p{0.13\textwidth}|p{0.82\textwidth}|}
+\caption{Authentication and account requirements (Must Have)}\\ \hline
+\frhead
+\endfirsthead
+\hline \frhead
+\endhead
+FR-AUTH-01 & \textbf{Registration by invitation.} A person with a valid invitation link registers with a display name and a password (BR-18) and becomes a Member of the inviting workspace. With an individual link the email is fixed by the invitation; with a shared link (FR-ADM-10) the person enters an email address of the linked domain and confirms it with a code. A person who already has an account authenticates instead of registering. \\ \hline
+FR-AUTH-02 & \textbf{Workspace registration.} A visitor creates a workspace by entering a workspace name, email, display name and password, and becomes its Workspace Administrator. The workspace and the account are created together or not at all. \\ \hline
+FR-AUTH-03 & \textbf{Login.} A user logs in with email and password; an unknown email and a wrong password give the same message "Invalid email or password". After 5 consecutive failed attempts, login is blocked for 10 minutes (BR-21). A user belonging to several workspaces selects one before the session is initiated. \\ \hline
+FR-AUTH-04 & \textbf{Session and logout.} A session stays valid until 12 hours after the user's last activity on particular device or ends on logout. After logout the session token is rejected and its real-time connection is closed, while sessions on other devices stay active. \\ \hline
+FR-AUTH-05 & \textbf{Profile and password change.} A user can edit their display name and change their password by entering the current one; the email cannot be changed (BR-19). A password change ends all other sessions of the user. \\ \hline
+\end{longtable}
+
+
+\subsubsubsection{Workspace and Channel Management}
+
+\begin{longtable}{|p{0.13\textwidth}|p{0.82\textwidth}|}
+\caption{Workspace and channel management requirements (Must Have)}\\ \hline
+\frhead
+\endfirsthead
+\hline \frhead
+\endhead
+FR-CH-01 & \textbf{Create channel.} Any member can create a public or private channel with a name and an optional description, within the channel creation limit set by the administrator (FR-ADM-08). The creator becomes its first member and Channel Manager. A duplicate name or an exceeded limit is rejected with the reason. \\ \hline
+FR-CH-03 & \textbf{Channel list, browsing and joining.} The sidebar lists the user's channels alphabetically, with archived channels in a separate collapsed group. \"Browse channels\" lists non-archived public channels with name, description and member count, supports search by name and offers a \"Join\" button. Joining makes the full history readable. \\ \hline
+FR-CH-04 & \textbf{Leave channel.} A member can leave any channel; the last Channel Manager must first assign a replacement. After leaving, the history is no longer readable or searchable by that user, and a private channel can be rejoined only when the user is added again. \\ \hline
+FR-CH-05 & \textbf{Manage members and managers.} A Channel Manager or a Workspace Administrator (FR-ADM-09) can add active workspace members to the channel (search by name or email), remove members, and promote or demote Channel Managers. The affected user is notified. \\ \hline
+FR-CH-07 & \textbf{Edit channel.} A Channel Manager or a Workspace Administrator can change the channel name and description. \\ \hline
+FR-CH-08 & \textbf{Archive and restore channel.} A Channel Manager or a Workspace Administrator can archive and restore a channel. An archived channel is read-only: sending, editing, pinning and channel edits are rejected by the server, while reading and search still work. \\ \hline
+FR-CH-09 & \textbf{Delete channel.} A Channel Manager or a Workspace Administrator can delete a channel after typing its name to confirm. The channel and its messages disappear immediately for all users, including search; the content is kept only for the audit period (FR-ADM-08). \\ \hline
+
+\end{longtable}
+
+
+\subsubsubsection{Real-Time Messaging}
+
+\begin{longtable}{|p{0.13\textwidth}|p{0.82\textwidth}|}
+\caption{Messaging requirements (Must Have)}\\ \hline
+\frhead
+\endfirsthead
+\hline \frhead
+\endhead
+FR-MSG-01 & \textbf{Send message.} A channel member sends text with Enter (Shift+Enter inserts a line break). An empty or too long message is rejected with an error and the typed text is kept. A user without permissions is rejected by the server. The sender sees a \"sending\" state that changes to \"sent\" once the server confirms. \\ \hline
+FR-MSG-02 & \textbf{Real-time delivery and reconnection.} New, edited, deleted and pinned messages and membership changes are pushed to online members without page refresh. After a lost connection the client reconnects automatically, shows a \"Reconnecting\ldots\" indicator and loads all missed messages without gaps or duplicates. A retried send is stored only once (client-generated message identifier). \\ \hline
+FR-MSG-03 & \textbf{Message history.} Opening a channel loads its 50 most recent messages; scrolling up loads 50 more each time. Messages show author, time and an \"edited\" label where applicable; deleted messages show the placeholder (BR-07). New messages arriving while the user has scrolled up show a \"New messages\" button instead of scrolling automatically. \\ \hline
+FR-MSG-04 & \textbf{Edit own message.} The author can edit their own message; it then shows an \"edited\" label with the edit time. Moderators or administrators can't edit other users messages. Deleted messages and messages in archived channels cannot be edited. \\ \hline
+FR-MSG-05 & \textbf{Delete message.} The author can delete their own message after a confirmation; a Channel Manager or a Workspace Administrator can delete any message in the channel. Others see the \"message deleted\" placeholder in real time. The deleted text is not returned by any request, including search. A deleted pinned message is unpinned. A moderator deletion is recorded in the audit log with moderator, author and channel, but not the text. \\ \hline
+FR-MSG-06 & \textbf{Pin and unpin messages.} A Channel Manager or a Workspace Administrator can pin and unpin messages. All members see them in the channel's \"Pinned messages\" panel, where selecting a message scrolls the channel to it. \\ \hline
+FR-MSG-07 & \textbf{Message search.} A user searches messages in the global search box across all channels they are a member of, including archived ones. Results are case-insensitive, never include deleted messages, are sorted newest first, 20 per page, and show channel, author, time and a snippet with the match highlighted; selecting a result opens the channel at that message. A query shorter than 2 characters is rejected. \\ \hline
+FR-MSG-08 & \textbf{Mentions.} Typing \"@\" suggests members of the current channel; the selected name is inserted and highlighted for everyone. Only channel members can be mentioned. The mentioned user gets the unread mention counter on that channel (FR-NOT-01). \\ \hline
+\end{longtable}
+
+
+\subsubsubsection{Notifications}
+
+\begin{longtable}{|p{0.13\textwidth}|p{0.82\textwidth}|}
+\caption{Notification requirements (Must Have)}\\ \hline
+\frhead
+\endfirsthead
+\hline \frhead
+\endhead
+FR-NOT-01 & \textbf{Unread indicators.} Each channel in the sidebar shows the number of unread messages that mention the user; if there are other unread messages, the channel name is displayed in bold. Indicators update in real time and are reset when the user opens the channel and sees the newest message. The user's own and deleted messages are not counted. The read position is stored on the server and needs to be the same on every device. \\ \hline
+FR-NOT-02 & \textbf{Event notifications.} A notification center (bell icon with a counter of unread entries) lists workspace events that concern the user and are not messages: being added to or removed from a channel, becoming or ceasing to be Channel Manager, archiving, restoring, renaming or deleting of the user's channel, and a change of the user's workspace role. Each entry has a text, a time and a link to the channel where applicable. The user can mark one or all entries as read. Online users receive entries in real time. The read state is stored on the server, the latest 50 entries are shown, older ones on request, and entries older than 30 days are removed. \\ \hline
+FR-NOT-03 & \textbf{Device registration.} Each valid session created within mobile applications saves device information with the corresponding associated \textit{push token}. \\ \hline
+\end{longtable}
+
+
+\subsubsubsection{Administration and Moderation}
+
+\begin{longtable}{|p{0.13\textwidth}|p{0.82\textwidth}|}
+\caption{Administration and moderation requirements (Must Have)}\\ \hline
+\frhead
+\endfirsthead
+\hline \frhead
+\endhead
+FR-ADM-01 & \textbf{Invite users.} A Workspace Administrator enters an email address and the system generates a single-use invitation link for copying. An email that is already a member of the workspace or has a pending invitation is rejected. The link contains a random token of at least 128 bits and expires after 7 days. The creation is recorded in the audit log. \\ \hline
+FR-ADM-02 & \textbf{Manage invitations.} An administrator can view individual and shared invitations with their status (pending, used, expired, revoked), revoke a pending invitation and regenerate an individual link (the previous link stops working and the 7-day validity restarts). Both actions are recorded in the audit log. \\ \hline
+FR-ADM-03 & \textbf{User directory.} An administrator can view the workspace users with name, email, role, status and registration date, search by name or email, filter by status and open the key events of a user (the audit entries concerning them, FR-ADM-07). \\ \hline
+FR-ADM-04 & \textbf{Change workspace role.} An administrator can change a user's role between Member and Workspace Administrator. The new rights apply without logging in again. The user is notified (FR-NOT-02) and the change is recorded in the audit log. \\ \hline
+FR-ADM-05 & \textbf{Deactivate and reactivate user.} An administrator can deactivate and reactivate a user; this is how users are removed from the workspace. Sessions and real-time connections of the user in this workspace end within seconds; past messages show the author name followed by \"(deactivated)\". Channels left without a manager are listed to the administrator designated in the respective organization settings, who acts as their manager until a new one is assigned. Both actions are recorded in the audit log. \\ \hline
+FR-ADM-07 & \textbf{Audit log.} An administrator can view a read-only audit log of: invitations created, revoked or regenerated; domain linked; role changes; user deactivation and reactivation; channel archived, restored or deleted; message deleted by a moderator; workspace settings changed. Each entry has time, acting user, action and target. It can be filtered by date range, acting user and action, and is loaded 50 entries per page, newest first. \\ \hline
+FR-ADM-08 & \textbf{Workspace settings.} An administrator sets the audit period in days (30--3650, default 90) and optionally the maximum number of channels a user can create. A scheduled job runs at least once a day and permanently removes deleted message content older than the audit period. \\ \hline
+FR-ADM-09 & \textbf{Ghost mode and channel oversight.} An administrator has an \"All channels\" view listing every channel, including private ones, with name, type, member count, managers and archived status. Any channel can be opened in ghost mode: the administrator reads its messages and uses the Channel Manager functions (FR-CH-05 to FR-CH-09, FR-MSG-05, FR-MSG-06), but cannot send or edit their messages unless they join as a member. \\ \hline
+FR-ADM-10 & \textbf{Shared invitation link.} An administrator links an email domain of the organization and generates a shared invitation link for it. The domain must first be verified via DNS (e.g. by adding a TXT record provided in the registration setup) to prove ownership. Anyone with an address at the domain can register through the link (FR-AUTH-01). The link can be used many times until it is revoked. Linking and revoking are recorded in the audit log. \\ \hline
+\end{longtable}
+
+\subsubsection{Should Have Requirements}
+Important functionality, implemented after the core scope.
+
+\begin{longtable}{|p{0.13\textwidth}|p{0.82\textwidth}|}
+\caption{Should Have requirements}\\ \hline
+\frhead
+\endfirsthead
+\hline \frhead
+\endhead
+FR-AUTH-06 & \textbf{Password reset by email.} A user can request a password reset on the login page; the system sends a single-use link valid for 30 minutes. The response is the same for registered and unknown emails, and after a reset all sessions of the user end. \\ \hline
+FR-ADM-11 & \textbf{Invitation by email.} In addition to FR-ADM-01, the system sends the individual invitation link to the invited address. \\ \hline
+FR-MSG-09 & \textbf{Search filters.} Search results can be restricted by channel, author and date range; filters can be combined and cleared. \\ \hline
+FR-MSG-10 & \textbf{Typing indicator.} Members see \"<name> is typing\ldots\" while another member of the open channel types; it disappears 5 seconds after the last keystroke or when the message is sent. \\ \hline
+FR-MSG-11 & \textbf{Presence status.} The member list shows whether a user is online, away (5 minutes without activity) or offline. \\ \hline
+FR-NOT-04 & \textbf{Push notifications.} The server integrates with the appropriate external services and sends push notifications if a linked device exists. \\ \hline
+\end{longtable}
+
+\subsubsection{Could Have Requirements}
+Optional features that improve usability.
+
+\begin{longtable}{|p{0.13\textwidth}|p{0.82\textwidth}|}
+\caption{Could Have requirements}\\ \hline
+\frhead
+\endfirsthead
+\hline \frhead
+\endhead
+FR-AUTH-07 & \textbf{Two-factor authentication.} A user can enable time-based one-time passwords (TOTP) as a second login step. \\ \hline
+FR-AUTH-08 & \textbf{Profile picture.} A user can upload an image (up to 2 MB) that is displayed next to their messages. \\ \hline
+FR-CH-10 & \textbf{Direct messages.} Two workspace members can have a private one-to-one conversation. It works like a private channel with exactly two members, has no Channel Manager and is exempt from BR-03. \\ \hline
+FR-MSG-12 & \textbf{Reply to a message.} A user can reply to a specific message; the reply shows a quote of the original and links to it. \\ \hline
+FR-MSG-13 & \textbf{Emoji reactions.} A user can add and remove an emoji reaction to a message; the number of reactions per emoji is shown. \\ \hline
+FR-MSG-14 & \textbf{File attachments.} A message can have up to 5 attachments (images or PDF, up to 10 MB each). \\ \hline
+FR-MSG-15 & \textbf{Basic formatting.} Messages support bold, italic, inline code, code blocks and links; raw HTML is never rendered. \\ \hline
+FR-UI-01 & \textbf{Dark theme.} A user can switch between a light and a dark theme; the choice is stored in the device settings. \\ \hline
+
+\end{longtable}
+
+\subsubsection{Won't Have Requirements}
+Features explicitly excluded from the initial version.
+
+\begin{longtable}{|p{0.13\textwidth}|p{0.82\textwidth}|}
+\caption{Won't Have requirements}\\ \hline
+\textbf{ID} & \textbf{Excluded feature \& reason} \\ \hline
+\endfirsthead
+\hline \textbf{ID} & \textbf{Excluded feature \& reason} \\ \hline
+\endhead
+W-01 & \textbf{Voice and video calls, screen sharing.} Requires real-time media infrastructure beyond the project scope. \\ \hline
+W-02 & \textbf{Third-party integrations, bots and webhooks.} No public API for external developers in the initial version. \\ \hline
+W-03 & \textbf{End-to-end encryption.} Incompatible with server-side search, moderation and audit requirements. \\ \hline
+W-04 & \textbf{Guest and external users.} Joining is possible only through an invitation or workspace registration (BR-10). \\ \hline
+W-05 & \textbf{Single sign-on (SAML, OAuth providers).} Authentication is limited to email and password. \\ \hline
+\end{longtable}
+
+\subsubsection{Business Rules}
+\begin{longtable}{|p{0.1\textwidth}|p{0.85\textwidth}|}
+\caption{Business rules}\\ \hline
+\textbf{ID} & \textbf{Rule} \\ \hline
+\endfirsthead
+\hline \textbf{ID} & \textbf{Rule} \\ \hline
+\endhead
+BR-01 & An account can belong to several workspaces, except an account whose email address is at the linked domain of a workspace, which can belong only to that workspace. A workspace is created through workspace registration or joined through an invitation. \\ \hline
+BR-02 & Public channels are visible and joinable by every workspace member; private channels are visible only to their members. A Workspace Administrator can open any channel in ghost mode (FR-ADM-09). \\ \hline
+BR-03 & Every channel has at least one Channel Manager; the last one cannot leave, be demoted or be removed. If the last manager is deactivated, administrators act as managers until a new one is assigned. \\ \hline
+BR-04 & Users can read a channel's history only while they are its members. Joining a public channel grants access to its full history. \\ \hline
+BR-06 & Message text is limited to 4000 Unicode characters. Empty and whitespace-only messages are rejected. \\ \hline
+BR-07 & Deleted messages are replaced by a ``message deleted'' placeholder. Deleted content and previous versions of edited messages are retained for the audit period configured by the administrator and then purged. \\ \hline
+BR-08 & Archived channels are read-only until restored. \\ \hline
+BR-09 & A deactivated user cannot log in to the workspace and receives no notifications. Past messages remain visible under the user's name and channel memberships are preserved and restored on reactivation. Deactivation applies to one workspace only. \\ \hline
+BR-10 & Joining an existing workspace requires an invitation from its administrator: an individual link (single use, expires after 7 days) or a shared link of a verified email domain (valid until revoked). \\ \hline
+BR-12 & Channel names are unique within a workspace (case-insensitive) and 1--80 characters long; descriptions are up to 250 characters. \\ \hline
+BR-14 & A channel can have at most 50 pinned messages. \\ \hline
+BR-15 & Messages in a channel are ordered by the server-assigned creation timestamp. \\ \hline
+BR-17 & A workspace always has at least one active Workspace Administrator, who cannot be demoted or deactivated. \\ \hline
+BR-18 & Passwords have at least 10 characters, including a letter and a digit, and are stored only as salted hashes. \\ \hline
+BR-19 & An email address belongs to at most one account in the whole system and cannot be changed. \\ \hline
+BR-20 & Workspace Administrator functions (FR-ADM-01 to FR-ADM-10) are available only in the web client. \\ \hline
+BR-21 & After 5 consecutive failed attempts to login, user is blocked for 10 minutes. \\ \hline
+\end{longtable}
+
+
+\section{Business Flows}
+
+The following flows define the business behavior and application decisions (as a separate actor).
+
+\vspace{0.5\baselineskip}
+\textbf{Note!} A failed validation leaves existing data unchanged, and the UI presents a recoverable error. A workspace membership/role check is performed again on the server for every protected operation.
+
+\subsection{Workspace Creation and Invitations}
+The process of creating a new organization and preparing it for use. An organization administrator (representative) registers the organization, creates their account and receives organization management privileges (while retaining the default Member role). The administrator configures organization settings, including the maximum number of channels a member can create, and sets up member registration by either generating individual invitations or linking an organization email domain and creating a shared invitation link.
+
+\begin{figure}[H]\centering\resizebox{0.8\textwidth}{!}{%
+\begin{tikzpicture}[node distance=7mm and 10mm, every node/.style={font=\small}, act/.style={draw,rounded corners,align=center,text width=39mm,minimum height=8mm},dec/.style={draw,diamond,aspect=2,align=center,inner sep=1pt,text width=27mm},>=Latex]
+\node[act] (a) {Visitor enters workspace, email, name, password};
+\node[dec,below=of a] (b) {Valid email unused?};
+\node[act,right=20mm of b] (err1) {Reject; show field errors; no records created};
+\node[act,below=of b] (c) {Create workspace, account and administrator membership atomically};
+\node[dec,below=of c] (e) {Invitation method?};
+\node[act,below left=12mm and 18mm of e] (f1) {Create email-specific invitation};
+\node[act,below=of f1] (g1) {Issue individual invitation link};
+\node[act,below right=12mm and 18mm of e] (f2) {Enter and verify organization email domain};
+\node[dec,below=of f2] (g2) {Domain verified?};
+\node[act,right=22mm of g2] (err2) {Display verification error; do not issue link};
+\node[act,below=of g2] (h2) {Issue domain-restricted shared invitation link};
+\draw[->] (a)--(b);\draw[->] (b)--node[above]{No}(err1);\draw[->] (b)--node[right]{Yes}(c);\draw[->] (c)--(e);\draw[->] (e)--node[above left]{Individual}(f1);\draw[->] (f1)--(g1);\draw[->] (e)--node[above right]{Shared}(f2);\draw[->] (f2)--(g2);\draw[->] (g2)--node[above]{No}(err2);\draw[->] (g2)--node[right]{Yes}(h2);
+\end{tikzpicture}}
+\caption{Workspace creation and invitation flow}
+\end{figure}
+
+\subsection{Invitation Registration and Login}
+The process of how new users register and access an organization. A user registers using either an individual invitation or a shared organization invitation link. The system validates the invitation, prompts credentials, creates the account, assigns the default Member role and associates the user with the organization.
+
+The login process must also account for users belonging to multiple organizations: such users select the organization they want to access before a session is initiated. Accounts registered with an organization email address can belong to only one organization and are automatically redirected.
+
+\begin{figure}[H]\centering
+\resizebox{0.7\linewidth}{!}{%
+\begin{tikzpicture}[node distance=6mm and 8mm,>=Latex,
+ every node/.style={font=\small},
+ act/.style={draw,rounded corners,align=center,text width=40mm,minimum height=8mm},
+ dec/.style={draw,diamond,aspect=2,align=center,text width=24mm,inner sep=1pt}]
+\node[act] (start) {Open invitation link};
+\node[dec,below=of start] (valid) {Token valid and allowed?};
+\node[act,right=14mm of valid] (invalid) {Show invalid, expired or used link};
+\node[dec,below=of valid] (kind) {Invitation kind?};
+\node[act,below left=11mm and 14mm of kind] (individual) {Use fixed invited email};
+\node[act,below right=11mm and 14mm of kind] (shared) {Enter eligible domain email and verify code};
+\node[act,below=20mm of kind] (account) {New user: register; existing user: authenticate};
+\node[act,below=of account] (commit) {Atomically add membership and consume invitation where applicable};
+\node[act,below=of commit] (login) {Login};
+\node[dec,below=of login] (multi) {Multiple workspaces?};
+\node[act,below left=11mm and 12mm of multi] (choose) {Select workspace};
+\node[act,below right=11mm and 12mm of multi] (automatic) {Use only eligible workspace};
+\node[act,below=22mm of multi] (session) {Issue workspace-scoped session};
+\draw[->] (start)--(valid);
+\draw[->] (valid)--node[above]{No}(invalid);
+\draw[->] (valid)--node[right]{Yes}(kind);
+\draw[->] (kind)--node[above left]{Individual}(individual);
+\draw[->] (kind)--node[above right]{Shared}(shared);
+\draw[->] (individual.south)|-(account.west);
+\draw[->] (shared.south)|-(account.east);
+\draw[->] (account)--(commit);
+\draw[->] (commit)--(login);
+\draw[->] (login)--(multi);
+\draw[->] (multi)--node[above left]{Yes}(choose);
+\draw[->] (multi)--node[above right]{No}(automatic);
+\draw[->] (choose.south)|-(session.west);
+\draw[->] (automatic.south)|-(session.east);
+\end{tikzpicture}%
+}
+\caption{Invitation registration and workspace selection}
+\end{figure}
+
+\subsection{Channel Creation, Transfer and Lifecycle}
+An organization member creates a channel, provided they have not exceeded the organization-defined channel creation limit. The creator automatically becomes the channel manager and can invite other organization members. A channel must always have at least one manager, meaning the current manager cannot leave or relinquish their role until another manager is appointed.
+
+\begin{figure}[H]\centering
+\resizebox{0.7\linewidth}{!}{%
+\begin{tikzpicture}[node distance=6mm and 9mm,>=Latex,
+ every node/.style={font=\small},
+ act/.style={draw,rounded corners,align=center,text width=41mm,minimum height=8mm},
+ dec/.style={draw,diamond,aspect=2,text width=25mm,align=center,inner sep=1pt}]
+\node[act] (a) {Member requests public or private channel};
+\node[dec,below=of a] (quota) {Valid name and within quota?};
+\node[act,right=14mm of quota] (reject) {Reject with validation reason};
+\node[act,below=of quota] (created) {Atomically create channel, membership and first manager};
+\node[act,below=of created] (manage) {Manage channel members and managers};
+\node[dec,below=of manage] (last) {Would action leave no manager?};
+\node[act,right=14mm of last] (block) {Block; request replacement manager};
+\node[act,below=of last] (allow) {Apply membership or manager change};
+\node[dec,below=of allow] (action) {Channel lifecycle action?};
+\node[act,below left=12mm and 12mm of action] (archive) {Archive or restore channel};
+\node[act,below right=12mm and 12mm of action] (delete) {Delete after typed name confirmation};
+\draw[->] (a)--(quota);
+\draw[->] (quota)--node[above]{No}(reject);
+\draw[->] (quota)--node[right]{Yes}(created);
+\draw[->] (created)--(manage);
+\draw[->] (manage)--(last);
+\draw[->] (last)--node[above]{Yes}(block);
+\draw[->] (last)--node[right]{No}(allow);
+\draw[->] (allow)--(action);
+\draw[->] (action)--node[above left]{Archive / restore}(archive);
+\draw[->] (action)--node[above right]{Delete}(delete);
+\end{tikzpicture}%
+}
+\caption{Channel creation, manager safeguard and lifecycle}
+\end{figure}
+
+
+\subsection{Non-Functional Requirements}
+
+The following non-functional requirements define the expected performance, availability, reliability, security and usability characteristics of the system.
+
+\begin{longtable}{|p{0.13\textwidth}|p{0.82\textwidth}|}
+\caption{Non-Functional Requirements}\\ \hline
+\frhead
+\endfirsthead
+\hline \frhead
+\endhead
+
+\multicolumn{2}{|c|}{Performance} \\ \hline
+NFR-PERF-01 & \textbf{Concurrent user support.} The system shall support up to 200 concurrently connected users without compromising the correctness of operations or data consistency. \\ \hline
+NFR-PERF-02 & \textbf{Real-time communication.} The system shall support real-time message exchange between connected channel members without requiring manual page refreshes. \\ \hline
+NFR-PERF-03 & \textbf{Resource scalability.} The system architecture shall allow computational and storage resources to be scaled as the number of users, organizations, channels and messages increases. \\ \hline
+
+\multicolumn{2}{|c|}{Availability and Reliability} \\ \hline
+NFR-REL-01 & \textbf{Data persistence.} The system shall ensure that successfully stored messages and other persistent user data remain available after application restarts or temporary service interruptions. \\ \hline
+NFR-REL-02 & \textbf{Failure recovery.} The system shall support recovery after unexpected service interruptions while preserving the integrity of previously stored data. \\ \hline
+NFR-REL-03 & \textbf{Connection recovery.} The system shall allow users to re-establish their sessions after temporary connection losses without requiring them to manually recreate or resubmit previously completed operations. \\ \hline
+
+\multicolumn{2}{|c|}{Security and Privacy} \\ \hline
+NFR-SEC-01 & \textbf{Organization data isolation.} The system shall prevent users from accessing data belonging to organizations they are not authorized to access. \\ \hline
+NFR-SEC-02 & \textbf{Role-based access control.} The system shall enforce role-based access restrictions on all protected operations, regardless of the client interface used to access them. \\ \hline
+NFR-SEC-03 & \textbf{Secure communication.} All communication between clients and the server shall be encrypted using HTTPS. \\ \hline
+NFR-SEC-04 & \textbf{Password security.} User passwords shall never be stored in plaintext and shall be protected using a modern password hashing algorithm. \\ \hline
+NFR-SEC-05 & \textbf{Session security.} The system shall invalidate user sessions after logout and prevent unauthorized reuse of expired sessions. \\ \hline
+
+\multicolumn{2}{|c|}{Usability and Accessibility} \\ \hline
+NFR-UI-01 & \textbf{Browser compatibility.} The web application shall support the latest stable versions of Google Chrome, Mozilla Firefox, Microsoft Edge and Safari. \\ \hline
+
+NFR-UI-02 & \textbf{Responsive layout.} The web application shall remain usable on desktop, tablet and mobile screen sizes. \\ \hline
+
+NFR-UI-03 & \textbf{Language and time.} The interface is in English. Times are stored in UTC and shown in the user's local time zone. \\ \hline
+\end{longtable}
+
+
+\section{Architecture}
+
+\subsection{Architecture overview}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{diagrams/package.png}
+    \caption{Fabula Packages}
+    \label{fig:fabulapackage}
+\end{figure}
+
+Fabula uses a \textbf{Modular Monolith} architecture, consisting of three client applications (Web, Android and iOS) that communicate with a shared \textbf{Core Backend} through a common API. No separate Backend for Frontend (BFF) components are used.
+
+The Core Backend is divided into logical modules, each responsible for a specific area of the system, such as authentication, authorization, organization management, channel management, messaging, notifications and audit logging. These modules belong to a single deployable application and share a \textbf{relational database}.
+
+The backend is designed to be \textbf{stateless}, meaning that it does not rely on storing user session state in individual application instances (no sticky sessions; session state is stored in the database and in client-side tokens). This allows multiple backend replicas to run behind a \textbf{Load Balancer}, distributing incoming requests and allowing the backend to scale independently when needed.
+
+Real-time communication is handled by a separate, independently deployable \textbf{Socket Service}, which manages WebSocket connections, channel subscriptions and real-time event delivery. All client applications use this service for real-time updates, including messages, message changes, channel events and organization notification center updates. The initial architecture assumes a single Socket Service replica, as horizontal scaling of this component is not required at this stage.
+
+External possible integrations include Firebase Cloud Messaging (FCM) and Apple Push Notification Service (APNs) for mobile push notifications. Push notifications are supported only for Android and iOS applications.
+
+Authorization is enforced by the backend using role-based access control (RBAC), independently of which client application is used.
+
+\subsection{Identity \& Access Management}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{diagrams/identity_management.png}
+    \caption{Identity \& Access Management}
+    \label{fig:identitymanagement}
+\end{figure}
+
+Authentication and authorization are handled as separate concerns. Authentication establishes the user's identity using the supported authentication methods, while authorization determines which actions the user is allowed to perform.
+
+The backend uses token-based authentication and does not require session storage in memory (session state is saved in the database and client-side tokens), allowing it to remain partly-stateless.
+
+Each active organization membership is automatically assigned the default Member role. Channel roles are assigned independently of organization roles and apply only within the respective channel. 
+
+The system uses Role-Based Access Control (RBAC). Available \textbf{permissions are predefined and assigned to roles}. Examples include:
+
+\begin{itemize}
+    \item Organization permissions:
+    \begin{itemize}
+        \item Organization.ViewMembers
+        \item Organization.ManageSettings
+        \item Organization.ManageInvitations
+        \item Organization.RemoveMembers
+    \end{itemize}
+
+    \item Channel permissions:
+    \begin{itemize}
+        \item Channel.Create
+        \item Channel.ManageMembers
+        \item Channel.ManageManagers
+    \end{itemize}
+
+    \item Message permissions:
+    \begin{itemize}
+        \item Message.Send
+        \item Message.EditOwn
+        \item Message.DeleteOwn
+        \item Message.Pin
+    \end{itemize}
+\end{itemize}
+
+The backend validates permissions for each protected operation, taking the user's current organization and, where applicable, channel context into account.
+
+Sessions are represented by random tokens (at least 256 bits) that are issued after successful login and bound to one workspace and one device. Only the SHA-256 hash of the token is stored, together with the last activity time, the expiry time and the revocation time. On every request (including when a WebSocket connection is opened), the backend looks the token up and checks that the session is neither expired nor revoked, and that the user's workspace membership is still active. It then evaluates permissions from the current roles. A valid request extends the expiry to 12 hours after the last activity (the stored activity time is updated at most once a minute to avoid a write on every request), and no separate refresh token is used.
+
+An expired session requires a new login (client discards its token on a \textbf{401} response). For users who belong to several workspaces, a short-lived self-contained login ticket (token) is issued after the password check and exchanged for a session token once the workspace has been selected. Web clients keep the token in safe memory, and mobile clients keep it in the platform secure storage (Keychain, Keystore).
+
+It is worth mentioning that self-contained tokens (such as JWT) would not fit here, because logout, deactivation, password change and role change must take effect within seconds.
+
+\subsection{Messaging}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{diagrams/messaging.png}
+    \caption{Messaging}
+    \label{fig:messaging}
+\end{figure}
+
+Only the message author can edit their own messages. When a message is edited, its existing content is updated and the \textit{isEdited} flag is set to true. Previous versions of the message can be retained until the configured retention period expires.
+
+Only the message author can delete their own messages. Deletion is implemented as a soft delete: the message is marked as deleted and its \textit{deletedAt} timestamp is recorded. The deleted message remains stored until the configured retention period expires, after which it can be permanently removed.
+
+A mention links a message to a specific user mentioned in its content. Message text contains \texttt{<@userId>} tokens and the server parses them, validates channel membership. Mentioned users can receive notifications about these mentions. Users with the ChannelManager role can pin and unpin messages within their channels.
+
+\subsection{Notifications}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{diagrams/notifications.png}
+    \caption{Notifications}
+    \label{fig:notifications}
+\end{figure}
+
+Organization notifications are displayed in the application's notification center. Updates are delivered to clients through the existing WebSocket connection. The \textit{readAt} timestamp remains empty until the user reads the notification.
+
+Push notifications are delivered to registered mobile devices using \textbf{FCM (Firebase Cloud Messaging) for Android} or \textbf{APNs (Apple Push Notification Service) for iOS}. A single notification may have multiple delivery targets and delivery attempts, as a user can have multiple registered devices.
+
+The Device entity represents a registered mobile device associated with a user. It stores the device's push notification token, which is required for delivering push notifications. Web browsers are not registered for push notifications in Fabula.
+
+\subsection{API Versioning \& Contracts}
+
+\subsubsection{Contract rules}
+The API is REST with JSON bodies. Resources are plural nouns, and administrator functions are grouped under \texttt{/admin}. Authentication uses a bearer token in the \textbf{Authorization} header.
+
+All workspace resources include the workspace identifier in the path, for example \texttt{/api/v1/workspaces/\{workspaceId\}/channels/\{channelId\}/messages}. A session is bound to one workspace, so the server compares the path workspace with the session workspace on every request and rejects a mismatch with \texttt{403} and the code \texttt{WORKSPACE\_MISMATCH}. This prevents a request from being applied to the wrong workspace if, for example, the user switches workspace in another tab. Only operations that exist outside a workspace do not include it. For example: registration, login, profile and password change and invitation acceptance.
+
+Identifiers are UUIDs, timestamps are ISO 8601 in UTC, field names use \textbf{camelCase}, and enumerations are uppercase strings matching the data model. List endpoints use cursor-based pagination (\texttt{limit}, \texttt{cursor}) with the page sizes defined in the requirements or in settings, and messages are ordered by server timestamp. Sending a message requires a client-generated \texttt{clientMessageId}.
+
+All errors share one JSON structure with a \texttt{code}, a \texttt{message} and optional field errors.
+
+\begin{table}[H]
+\centering
+\small
+\caption{HTTP status codes}
+\begin{tabular}{|p{0.2\textwidth}|p{0.75\textwidth}|}
+\hline
+\textbf{Status} & \textbf{Use} \\ \hline
+400, 422 & Malformed request or failed validation. \\ \hline
+401 & Missing, expired or revoked token. \\ \hline
+403 & Missing permission or workspace mismatch. \\ \hline
+404 & Resource not found or not visible to the user. \\ \hline
+409 & Conflict (e.g. duplicate channel name or archived channel). \\ \hline
+423 & Login blocked after repeated failures (BR-21). \\ \hline
+426 & Client version below the minimum supported version. \\ \hline
+429 & Too many requests. \\ \hline
+\end{tabular}
+\end{table}
+
+\subsubsection{Versioning}
+The major version is part of the path (\texttt{/api/v1/\ldots}). A new major version is created only for breaking changes such as removed or renamed fields, changed meaning or new required request fields, but backward-compatible changes (such as new optional fields, endpoints or event types) are made within the same version. The previous major version stays available for a transition period. Additionally, Mobile clients send their application version in the \textbf{X-Client-Version} header; if it is below the minimum supported version, the server responds with \textbf{426 Upgrade Required} and the application asks the user to update.
+
+\subsubsection{Real-time protocol}
+The Socket Service delivers server events over \textbf{WebSocket}. Commands that change data (sending, editing, deleting, pinning) always go through the HTTPS API, which keeps validation, authorization and auditing in one place. The only client-to-server WebSocket message (besides keep-alive pings) is the typing signal.
+
+While the user types, the client sends a typing message with the channel identifier, once every 3 seconds (at most). The Socket Service checks that the sender is a member of a non-archived channel and forwards an event to the other connected members, without involving the Core Backend. Typing events are not stored and not delivered after reconnect. Receiving clients hide the indicator 5 seconds after the last typing message or when new chat message signal arrives from that user.
+
+The client connects with its session token. The service rejects invalid tokens and closes the connection when the session is revoked. After connecting, the client automatically receives events for the channels it belongs to. The \textbf{Core Backend} informs the \textbf{Socket Service} about membership changes, so a removed member stops receiving events immediately. The client reconnects automatically with increasing delay.
+
+Every event uses the same envelope: \texttt{eventId}, \texttt{type}, \texttt{occurredAt}, \texttt{workspaceId}, \texttt{channelId} (where applicable) and \texttt{payload}. The payload never contains the text of deleted messages. Clients ignore duplicates by \texttt{eventId}, and because events can be lost during disconnects, the API remains the main source. After every reconnect the client requests missed data using its last known message.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Real-time events and signals}
+\begin{tabular}{|p{0.23\textwidth}|p{0.17\textwidth}|p{0.55\textwidth}|}
+\hline
+\textbf{Name} & \textbf{Direction} & \textbf{Meaning} \\ \hline
+\textbf{message.created} & Server to client & New message in a channel, including mentioned users. \\ \hline
+\textbf{message.updated} & Server to client & Message edited, pinned or unpinned. \\ \hline
+\textbf{message.deleted} & Server to client & Message replaced by the placeholder. \\ \hline
+\textbf{channel.updated} & Server to client & Channel renamed, archived, restored or deleted. \\ \hline
+\textbf{channel.unread} & Server to client & Unread state of one channel changed for the user. \\ \hline
+\textbf{membership.changed} & Server to client & User added, removed or channel role changed. \\ \hline
+\textbf{notification.created} & Server to client & New entry in the notification center. \\ \hline
+\textbf{notification.read} & Server to client & Entries marked as read on another device. \\ \hline
+\textbf{presence.changed} & Server to client & User became online, away or offline (FR-MSG-11). \\ \hline
+\textbf{typing} & Client to server & User is typing in a channel (FR-MSG-10). \\ \hline
+\textbf{typing.started} & Server to client & Another member is typing in the open channel. \\ \hline
+
+\end{tabular}
+\end{table}
+
+\subsection{Mobile Applications}
+
+The Android and iOS applications use the same HTTPS API and the same Socket Service as the web application. Whether the mobile clients are built natively or with a cross-platform approach, the architecture does not depend on it. The choice is therefore left to the implementation phase.
+
+Mobile clients differ from the web client in how messages reach an inactive application. Mobile operating systems suspend applications in the background and close their WebSocket connections, so real-time delivery alone is not enough. The figure below shows the simplified flow.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{diagrams/mobile_messaging.png}
+    \caption{Message delivery to a mobile device}
+    \label{fig:mobilemessaging}
+\end{figure}
+
+Push notifications are sent only to registered mobile devices without an active WebSocket connection and contain no message text -- only generic text and a channel link-ensuring deleted content is never exposed outside the application. Devices are registered upon login and revoked upon logout or user deactivation to prevent revoked devices from receiving notifications. To handle frequent connection drops from background mode or network changes, clients automatically recover state after reconnecting by loading missed messages from the API. Furthermore, authentication tokens are isolated from plain application storage and secured within the platform's native secure storage, such as \textbf{iOS Keychain} or \textbf{Android Keystore}. Administrator functions and invitation links work only in the web client.
+
+\section{Wireframes}
+
+\subsection{Implemented requirements}
+
+% % Neigyvendinti arba is dalies
+% AUTH-01
+% AUTH-04 (netaikoma)
+% CH-09
+% MSG-02 (netaikoma)
+% MSG-04 (is dalies)
+% MSG-05
+% MSG-06
+% MSG-07
+% MSG-08
+% NOT-03 (netaikoma)
+% ADM-05 (is dalies)
+% ADM-09
+% ADM-10 (is dalies)
+% % !!! IGYVENDINTI REQUIREMENTS
+% AUTH-02
+% AUTH-03
+% AUTH-05
+% CH-01
+% CH-03
+% CH-04
+% CH-05
+% CH-07
+% CH-08
+% MSG-01
+% MSG-03
+% NOT-01
+% NOT-02
+% ADM-01
+% ADM-02
+% ADM-03
+% ADM-04
+% ADM-07
+% ADM-08
+
+The wireframes mainly cover the Must Have scope. The web wireframe implements the account requirements for workspace registration, login (\textbf{FR-AUTH-02, FR-AUTH-03, FR-AUTH-05}). It also implements all channel management requirements except deletion: channel creation, the channel list with browsing and joining, leaving, member and manager management, editing, and archiving and restoring (\textbf{FR-CH-01, FR-CH-03, FR-CH-04, FR-CH-05, FR-CH-07, FR-CH-08}). Sending messages and message history are shown in both the web and mobile wireframes (\textbf{FR-MSG-01, FR-MSG-03}), as are the unread indicators and the notification center (\textbf{FR-NOT-01, FR-NOT-02}). The administration views, available only in the web wireframe, cover user invitations and their management, the user directory, workspace role changes, the audit log and workspace settings (\textbf{FR-ADM-01 to FR-ADM-04, FR-ADM-07, FR-ADM-08}).
+
+Some requirements are only partly shown or not shown. Message editing (\textbf{FR-MSG-04}), user deactivation (\textbf{FR-ADM-05}) and shared invitation links (\textbf{FR-ADM-10}) are covered only in part. Registration by invitation (\textbf{FR-AUTH-01}), channel deletion (\textbf{FR-CH-09}), message deletion, pinning and mentions (\textbf{FR-MSG-05 -- FR-MSG-08}) and ghost mode (\textbf{FR-ADM-09}) are not covered. Session handling (\textbf{FR-AUTH-04}) and real-time delivery with reconnection (\textbf{FR-MSG-02}) describe system behavior rather than screens, so they do not apply to static wireframes.
+
+Overall, the screens, controls, dialogs and examples in the wireframes implement one or few requirements listed above.
+
+\subsection{Information architecture}
+
+Both wireframes use a fine-grained ontology. A \textbf{Workspace} contains \textbf{Channels}, which contain \textbf{Messages} created by \textbf{Users}. Messages have attributes (such as content, timestamp, author, edit status, etc.). Users have different roles and permissions. The web wireframe additionally includes administrative entities such as \textbf{Invitations}, \textbf{Audit logs}, and workspace-wide user management.
+
+Wireframes follow a top-down design approach, starting with the main navigation structure and then designing individual screens for messaging, channel management, searching, and account settings. The web (on bigger screens) design prioritizes simultaneous access to multiple functions, while mobile focuses on completing tasks through fewer screens at a time.
+
+Both wireframes use a hybrid hierarchical-network structure. Users navigate from a \textbf{Workspace} to \textbf{Channels}, then to \textbf{Messages} and channel-specific settings. Search and notifications provide shortcuts between different sections.
+
+% \subsubsection{Content organization schemes}
+% Both wireframes use a hybrid organization scheme:
+% \begin{itemize}
+%     \item \textbf{Topic-based:} Content is organized into channels and workspace sections.
+%     \item \textbf{Task-based:} Functions are grouped around messaging, channel management, and account settings.
+%     \item \textbf{Chronological:} Messages, notifications, and audit events are ordered by time.
+% \end{itemize}
+
+Wireframes use descriptive textual labels and simple icons and provide message search across accessible channels. Web provides search through the top navigation bar, while mobile provides a dedicated Search tab.
+
+\subsection{Navigation patterns}
+
+The web wireframe uses:
+\begin{itemize}
+    \item \textbf{Sidebar navigation} for channels and workspace functions.
+    \item \textbf{Top navigation} for search, notifications, and profile access.
+    \item \textbf{Contextual menus and dialogs} for message and channel operations.
+\end{itemize}
+
+The mobile wireframe uses:
+\begin{itemize}
+    \item \textbf{Bottom navigation} for Channels, Search, Alerts, and Profile.
+    \item \textbf{Hierarchical navigation} with back buttons for returning to previous screens.
+    \item \textbf{Contextual actions} for message and channel management.
+\end{itemize}
+
+\subsection{Prototyping tools and preview instructions}
+
+Both wireframe mockups were created using Figma. Run the  \href{https://www.figma.com/proto/PdyVNxzIInKRn8fohzkQxw/?node-id=9-2&t=uGHR2VNPcXUkVMGI-1&page-id=1%3A84&starting-point-node-id=9%3A2}{\textbf{web version} on \textbf{www.figma.com/proto/PdyVNxzIInKRn8fohzkQxw/?node-id=9-2}}. Open the  \href{https://www.figma.com/proto/PdyVNxzIInKRn8fohzkQxw/?node-id=9-958&t=h2750Oqgq7jkQqpQ-1&page-id=1%3A1065&starting-point-node-id=9%3A958}{\textbf{mobile version} on \textbf{www.figma.com/proto/PdyVNxzIInKRn8fohzkQxw/?node-id=9-95}}.
+
+\section{Data Model}
+
+The application data model is represented using compact entity boxes and no methods or inheritance are included. Identifiers use \texttt{UUID}; timestamps use \texttt{TIMESTAMPTZ} (UTC); \texttt{?} indicates a nullable field. \textbf{PK} and \textbf{FK} denote primary and foreign keys. Enumerated values and cross-entity restrictions are specified below. All tokens stored for authentication or invitations are hashed.
+
+\newcommand{\dmclass}[2]{%
+\begin{minipage}[t]{0.485\textwidth}\centering\footnotesize
+\renewcommand{\arraystretch}{1.12}%
+\begin{tabular}{|p{0.535\linewidth}|p{0.365\linewidth}|}\hline
+\multicolumn{2}{|c|}{\cellcolor[gray]{0.88}\textbf{#1}}\\\hline
+\textbf{Field} & \textbf{Type}\\\hline
+#2
+\end{tabular}\end{minipage}}
+\newcommand{\dmpair}[4]{\noindent\dmclass{#1}{#2}\hfill\dmclass{#3}{#4}\par\vspace{0.75em}}
+\newcommand{\dmsingle}[2]{\noindent\dmclass{#1}{#2}\par\vspace{0.75em}}
+
+\subsection{Identity and workspace entities}
+\dmpair{User}{%
+\textbf{id} (PK) & UUID\\\hline
+email (unique) & VARCHAR(320)\\\hline
+displayName & VARCHAR(100)\\\hline
+passwordHash & TEXT\\\hline
+createdAt & TIMESTAMPTZ\\\hline
+updatedAt & TIMESTAMPTZ\\\hline
+lockedUntil & TIMESTAMPTZ?\\\hline
+failedLoginCount & INTEGER\\\hline
+}{Workspace}{%
+\textbf{id} (PK) & UUID\\\hline
+name & VARCHAR(150)\\\hline
+createdByUserId (FK) & UUID\\\hline
+createdAt & TIMESTAMPTZ\\\hline
+}
+
+\dmpair{WorkspaceMembership}{%
+\textbf{id} (PK) & UUID\\\hline
+workspaceId (FK) & UUID\\\hline
+userId (FK) & UUID\\\hline
+role & ENUM\\\hline
+status & ENUM\\\hline
+joinedAt & TIMESTAMPTZ\\\hline
+deactivatedAt & TIMESTAMPTZ?\\\hline
+}{WorkspaceSettings}{%
+\textbf{workspaceId} (PK, FK) & UUID\\\hline
+auditRetentionDays & INTEGER\\\hline
+maxChannelsPerUser & INTEGER?\\\hline
+fallbackAdminId (FK) & UUID?\\\hline
+updatedAt & TIMESTAMPTZ\\\hline
+}
+
+\dmpair{VerifiedDomain}{%
+\textbf{id} (PK) & UUID\\\hline
+workspaceId (FK) & UUID\\\hline
+domainName & VARCHAR(253)\\\hline
+dnsVerificationHash & TEXT\\\hline
+verifiedAt & TIMESTAMPTZ?\\\hline
+createdAt & TIMESTAMPTZ\\\hline
+}{Invitation}{%
+\textbf{id} (PK) & UUID\\\hline
+workspaceId (FK) & UUID\\\hline
+createdByUserId (FK) & UUID\\\hline
+type & ENUM\\\hline
+email & VARCHAR(320)?\\\hline
+verifiedDomainId (FK) & UUID?\\\hline
+tokenHash (unique) & TEXT\\\hline
+expiresAt & TIMESTAMPTZ?\\\hline
+usedByUserId (FK) & UUID?\\\hline
+usedAt & TIMESTAMPTZ?\\\hline
+revokedAt & TIMESTAMPTZ?\\\hline
+createdAt & TIMESTAMPTZ\\\hline
+}
+
+\dmpair{EmailVerification}{%
+\textbf{id} (PK) & UUID\\\hline
+invitationId (FK) & UUID\\\hline
+email & VARCHAR(320)\\\hline
+codeHash & TEXT\\\hline
+expiresAt & TIMESTAMPTZ\\\hline
+verifiedAt & TIMESTAMPTZ?\\\hline
+}{Session}{%
+\textbf{id} (PK) & UUID\\\hline
+userId (FK) & UUID\\\hline
+workspaceId (FK) & UUID\\\hline
+tokenHash (unique) & TEXT\\\hline
+clientType & ENUM\\\hline
+lastActivityAt & TIMESTAMPTZ\\\hline
+expiresAt & TIMESTAMPTZ\\\hline
+revokedAt & TIMESTAMPTZ?\\\hline
+createdAt & TIMESTAMPTZ\\\hline
+}
+
+\subsection{Channels and messaging entities}
+\dmpair{Channel}{%
+\textbf{id} (PK) & UUID\\\hline
+workspaceId (FK) & UUID\\\hline
+createdByUserId (FK) & UUID\\\hline
+name & VARCHAR(80)\\\hline
+description & VARCHAR(250)?\\\hline
+visibility & ENUM\\\hline
+createdAt & TIMESTAMPTZ\\\hline
+archivedAt & TIMESTAMPTZ?\\\hline
+deletedAt & TIMESTAMPTZ?\\\hline
+}{ChannelMembership}{%
+\textbf{id} (PK) & UUID\\\hline
+channelId (FK) & UUID\\\hline
+userId (FK) & UUID\\\hline
+role & ENUM\\\hline
+joinedAt & TIMESTAMPTZ\\\hline
+lastReadMessageId (FK) & UUID?\\\hline
+lastReadAt & TIMESTAMPTZ?\\\hline
+}
+
+\dmpair{Message}{%
+\textbf{id} (PK) & UUID\\\hline
+channelId (FK) & UUID\\\hline
+authorUserId (FK) & UUID\\\hline
+clientMessageId & UUID\\\hline
+body & VARCHAR(4000)?\\\hline
+isEdited & BOOLEAN\\\hline
+createdAt & TIMESTAMPTZ\\\hline
+editedAt & TIMESTAMPTZ?\\\hline
+deletedAt & TIMESTAMPTZ?\\\hline
+deletedByUserId (FK) & UUID?\\\hline
+pinnedAt & TIMESTAMPTZ?\\\hline
+pinnedByUserId (FK) & UUID?\\\hline
+}{MessageRevision}{%
+\textbf{id} (PK) & UUID\\\hline
+messageId (FK) & UUID\\\hline
+body & VARCHAR(4000)\\\hline
+validUntil & TIMESTAMPTZ\\\hline
+replacedAt & TIMESTAMPTZ\\\hline
+}
+
+\dmpair{MessageMention}{%
+\textbf{messageId} (PK, FK) & UUID\\\hline
+\textbf{mentionedUserId} (PK, FK) & UUID\\\hline
+createdAt & TIMESTAMPTZ\\\hline
+}{Notification}{%
+\textbf{id} (PK) & UUID\\\hline
+workspaceId (FK) & UUID\\\hline
+recipientUserId (FK) & UUID\\\hline
+actorUserId (FK) & UUID?\\\hline
+channelId (FK) & UUID?\\\hline
+type & ENUM\\\hline
+text & TEXT\\\hline
+createdAt & TIMESTAMPTZ\\\hline
+readAt & TIMESTAMPTZ?\\\hline
+}
+
+\subsection{Audit and device entities}
+\dmpair{AuditEvent}{%
+\textbf{id} (PK) & UUID\\\hline
+workspaceId (FK) & UUID\\\hline
+actorUserId (FK) & UUID?\\\hline
+targetUserId (FK) & UUID?\\\hline
+targetType & ENUM\\\hline
+targetId & UUID?\\\hline
+action & ENUM\\\hline
+details & JSONB?\\\hline
+occurredAt & TIMESTAMPTZ\\\hline
+}{Device}{%
+\textbf{id} (PK) & UUID\\\hline
+userId (FK) & UUID\\\hline
+sessionId (FK) & UUID\\\hline
+platform & ENUM\\\hline
+pushToken & TEXT\\\hline
+registeredAt & TIMESTAMPTZ\\\hline
+lastSeenAt & TIMESTAMPTZ?\\\hline
+revokedAt & TIMESTAMPTZ?\\\hline
+}
+
+\dmpair{PushDelivery}{%
+\textbf{id} (PK) & UUID\\\hline
+notificationId (FK) & UUID\\\hline
+deviceId (FK) & UUID\\\hline
+status & ENUM\\\hline
+createdAt & TIMESTAMPTZ\\\hline
+sentAt & TIMESTAMPTZ?\\\hline
+}{PushDeliveryAttempt}{%
+\textbf{id} (PK) & UUID\\\hline
+pushDeliveryId (FK) & UUID\\\hline
+attemptNumber & INTEGER\\\hline
+provider & ENUM\\\hline
+providerMessageId & TEXT?\\\hline
+errorCode & VARCHAR(100)?\\\hline
+attemptedAt & TIMESTAMPTZ\\\hline
+}
+
+\subsection{Entities for optional requirements}
+The following entities apply only when the corresponding \textit{Should Have} or \textit{Could Have} requirements are implemented. Direct messages can reuse \texttt{Channel} and \texttt{ChannelMembership} with a dedicated channel type and the constraint of exactly two participants.
+\dmpair{PasswordResetToken (Should)}{%
+\textbf{id} (PK) & UUID\\\hline
+userId (FK) & UUID\\\hline
+tokenHash & TEXT\\\hline
+expiresAt & TIMESTAMPTZ\\\hline
+usedAt & TIMESTAMPTZ?\\\hline
+}{UserMfa (Could)}{%
+\textbf{userId} (PK, FK) & UUID\\\hline
+encryptedTotpSecret & TEXT\\\hline
+enabledAt & TIMESTAMPTZ\\\hline
+}
+
+\dmpair{MessageReaction (Could)}{%
+\textbf{messageId} (PK, FK) & UUID\\\hline
+\textbf{userId} (PK, FK) & UUID\\\hline
+\textbf{emoji} (PK) & VARCHAR(32)\\\hline
+createdAt & TIMESTAMPTZ\\\hline
+}{MessageAttachment (Could)}{%
+\textbf{id} (PK) & UUID\\\hline
+messageId (FK) & UUID\\\hline
+storageKey & TEXT\\\hline
+fileName & VARCHAR(255)\\\hline
+mimeType & VARCHAR(100)\\\hline
+sizeBytes & BIGINT\\\hline
+createdAt & TIMESTAMPTZ\\\hline
+}
+
+\dmsingle{Message (Could)}{%
+\multicolumn{2}{|c|}{\textit{same as before +}} \\\hline
+parentMessageId (FK) & UUID\\\hline
+}
+
+\subsection{Relationships and integrity constraints}
+
+\textbf{Workspace membership.} \texttt{User} $1$--$*$ \texttt{WorkspaceMembership} $*$--$1$ \texttt{Workspace}. Enforce \texttt{UNIQUE(workspaceId,userId)}. Workspace role is \texttt{MEMBER} or \texttt{ADMINISTRATOR}; status is \texttt{ACTIVE} or \texttt{DEACTIVATED}. Every workspace has an active administrator (BR-17).
+
+\textbf{Channels.} \texttt{Workspace} $1$--$*$ \texttt{Channel}; \texttt{Channel} $1$--$*$ \texttt{ChannelMembership}; \texttt{User} $1$--$*$ \texttt{ChannelMembership}. Enforce \texttt{UNIQUE(channelId,userId)} and case-insensitive uniqueness of channel names among non-deleted channels within a workspace (BR-12). Channel visibility is \texttt{PUBLIC} or \texttt{PRIVATE}; channel role is \texttt{MEMBER}, \texttt{GHOST} or \texttt{MANAGER}. Every active channel has a manager.
+
+\textbf{Messages.} \texttt{Channel} $1$--$*$ \texttt{Message}; \texttt{Message} $1$--$*$ \texttt{MessageRevision} and \texttt{Message} $1$--$*$ \texttt{MessageMention}. Enforce \texttt{UNIQUE(channelId,authorUserId,clientMessageId)} to depect retry duplicates. Only a current channel member may author or be mentioned in a new message.
+
+\textbf{Read state.} \texttt{ChannelMembership.lastReadMessageId} identifies the last seen message, constrained to that channel. Unread and unread-mention counts are calculated from this read position, \texttt{Message} and \texttt{MessageMention}, excluding the user's own and deleted messages; no duplicated counters are persisted.
+
+\textbf{Invitations and domain.} \texttt{Workspace} $1$--$*$ \texttt{Invitation}; individual invitations specify an email, while shared invitations reference a verified domain and remain usable until revoked. \textit{EmailVerification} relates to registration. Email uniqueness is global.
+
+\textbf{Sessions and notifications.} A \textit{User} can have several \textit{Session} and \textit{Device} entries; sessions are scoped to one workspace and expire 12 hours after the last activity, unless revoked. \textit{Notification} belongs to one recipient in one workspace. \texttt{Notification} $1$--$*$ \texttt{PushDelivery} $1$--$*$ \texttt{PushDeliveryAttempt}.
+
+\textbf{Audit and retention.} \textit{AuditEvent} is append-only and records actor, action and target. Deleted message bodies and historical revisions are kept only for the configured audit retention. A removed channel remains soft-deleted during the retention period, invisible to normal users. Audit history must not be lost through cascading deletes.
+\end{document}
